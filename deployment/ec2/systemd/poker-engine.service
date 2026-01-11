@@ -1,0 +1,19 @@
+[Unit]
+Description=Poker Equity Engine API Server
+After=network.target
+
+[Service]
+Type=simple
+User=poker-engine
+Group=poker-engine
+WorkingDirectory=/opt/poker-engine
+Environment="PATH=/opt/poker-engine/venv/bin"
+Environment="PYTHONUNBUFFERED=1"
+ExecStart=/opt/poker-engine/venv/bin/uvicorn src.python.api.server:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
