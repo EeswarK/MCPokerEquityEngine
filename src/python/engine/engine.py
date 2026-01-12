@@ -1,7 +1,8 @@
-from typing import Dict, Callable, Optional
+from typing import Callable, Dict, Optional
+
 from ..models.card import Card
-from ..models.job import JobRequest, PerformanceMetrics, EquityResult
-from ..utils.metrics import MetricsCollector
+from ..models.job import EquityResult, JobRequest
+from ..utils.shared_memory import SharedMemoryWriter
 
 
 class EquityEngine:
@@ -11,49 +12,76 @@ class EquityEngine:
         simulate_hand: Callable[[list[Card], list[Card], int], int],
         mode: str,
         num_workers: Optional[int] = None,
+        job_id: Optional[str] = None,
     ):
         self.evaluate_hand = evaluate_hand
         self.simulate_hand = simulate_hand
         self.mode = mode
         self.num_workers = num_workers
-        self.metrics_collector = MetricsCollector()
         self._progress_callback: Optional[Callable[[float, Dict[str, float]], None]] = None
 
-    def set_progress_callback(
-        self, callback: Callable[[float, Dict[str, float]], None]
-    ):
+        self.shm_writer: Optional[SharedMemoryWriter] = None
+        if job_id:
+            self.shm_writer = SharedMemoryWriter(job_id)
+            if not self.shm_writer.create():
+                import logging
+
+                logging.warning(f"Failed to create shared memory for job {job_id}")
+                self.shm_writer = None
+        self.simulations_processed = 0
+        self.update_frequency = 10000
+        self.last_update_count = 0
+
+    def set_progress_callback(self, callback: Callable[[float, Dict[str, float]], None]):
         self._progress_callback = callback
 
     def _report_progress(self, progress: float, results: Dict[str, float]):
         if self._progress_callback:
             self._progress_callback(progress, results)
 
-    def calculate_range_equity(
-        self, request: JobRequest
-    ) -> Dict[str, EquityResult]:
-        self.metrics_collector.start()
+    def calculate_range_equity(self, request: JobRequest) -> Dict[str, EquityResult]:
         results: Dict[str, EquityResult] = {}
+        self.simulations_processed = 0
+        self.last_update_count = 0
 
         hand_names = list(request.range_spec.keys())
         total_hands = len(hand_names)
         simulations_per_hand = request.num_simulations // total_hands
 
-        for idx, hand_name in enumerate(hand_names):
-            hole_cards = request.range_spec[hand_name]
-            equity_result = self._calculate_hand_equity(
-                hole_cards,
-                request.board,
-                request.num_opponents,
-                simulations_per_hand,
-            )
-            equity_result.hand_name = hand_name
-            results[hand_name] = equity_result
+        try:
+            for idx, hand_name in enumerate(hand_names):
+                hole_cards = request.range_spec[hand_name]
+                equity_result = self._calculate_hand_equity(
+                    hole_cards,
+                    request.board,
+                    request.num_opponents,
+                    simulations_per_hand,
+                )
+                equity_result.hand_name = hand_name
+                results[hand_name] = equity_result
+                self.simulations_processed += simulations_per_hand
 
-            progress = (idx + 1) / total_hands
-            current_results = {
-                name: result.equity for name, result in results.items()
-            }
-            self._report_progress(progress, current_results)
+                if self.shm_writer:
+                    if (
+                        self.simulations_processed - self.last_update_count
+                    ) >= self.update_frequency:
+                        self.shm_writer.update_hands(self.simulations_processed)
+                        self.last_update_count = self.simulations_processed
+
+                progress = (idx + 1) / total_hands
+                current_results = {name: result.equity for name, result in results.items()}
+                self._report_progress(progress, current_results)
+
+            if self.shm_writer:
+                self.shm_writer.update_hands(self.simulations_processed)
+                self.shm_writer.set_status(1)
+                self.shm_writer.close()
+
+        except Exception:
+            if self.shm_writer:
+                self.shm_writer.set_status(2)
+                self.shm_writer.close()
+            raise
 
         return results
 
@@ -77,8 +105,6 @@ class EquityEngine:
             else:
                 losses += 1
 
-        self.metrics_collector.record_simulations(num_simulations)
-
         total = wins + ties + losses
         equity = (wins + ties * 0.5) / total if total > 0 else 0.0
 
@@ -90,12 +116,6 @@ class EquityEngine:
             losses=losses,
             total_simulations=num_simulations,
         )
-
-    def get_metrics(self) -> PerformanceMetrics:
-        metrics_dict = self.metrics_collector.get_metrics(
-            self.mode, self.num_workers
-        )
-        return PerformanceMetrics(**metrics_dict)
 
     def get_mode(self) -> str:
         return self.mode

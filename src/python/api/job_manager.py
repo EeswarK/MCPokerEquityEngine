@@ -1,8 +1,8 @@
+import threading
 from dataclasses import dataclass, field
-from typing import Dict, Optional
 from datetime import datetime
 from enum import Enum
-import threading
+from typing import Dict, Optional
 
 from ..models.job import EquityResult, PerformanceMetrics
 
@@ -32,7 +32,9 @@ class JobState:
             self.progress = progress
             self.current_results = current_results.copy()
 
-    def complete(self, results: Dict[str, EquityResult], metrics: PerformanceMetrics):
+    def complete(
+        self, results: Dict[str, EquityResult], metrics: Optional[PerformanceMetrics] = None
+    ):
         with self._lock:
             self.status = JobStatus.COMPLETED
             self.results = results
