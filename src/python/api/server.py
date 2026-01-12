@@ -1,9 +1,11 @@
 import asyncio
 import json
+import logging
 import uuid
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, status
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect, status
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from .executor import execute_job_async
 from .job_manager import JobManager
@@ -14,6 +16,24 @@ from .models import (
     create_job_request_to_internal,
 )
 from .websocket import ConnectionManager
+
+logger = logging.getLogger("uvicorn.error")
+
+
+class RequestLoggingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        try:
+            client = request.client.host if request.client else "unknown"
+            method = request.method
+            url = str(request.url)
+            headers = dict(request.headers)
+
+            logger.warning(f"Request: {method} {url} | Client: {client} | Headers: {headers}")
+        except Exception as e:
+            logger.error(f"Failed to log request: {e}")
+
+        return await call_next(request)
+
 
 app = FastAPI(
     title="Poker Equity Engine API",
@@ -28,6 +48,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.add_middleware(RequestLoggingMiddleware)
 
 job_manager = JobManager()
 connection_manager = ConnectionManager()
