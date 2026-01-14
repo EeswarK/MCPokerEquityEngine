@@ -54,24 +54,44 @@ int main(int argc, char* argv[]) {
             next_tick += interval;
 
             try {
-                auto snapshot = shm_reader.read_consistent();
+                auto telemetry_snapshot = shm_reader.read_telemetry_consistent();
+                auto equity_snapshot = shm_reader.read_equity_consistent();
 
                 ProcessMetrics metrics = metrics_collector.collect();
 
-                flatbuffers::FlatBufferBuilder builder(256);
+                flatbuffers::FlatBufferBuilder builder(8192);  // Larger buffer for equity results
+
+                // Build equity results vector
+                std::vector<flatbuffers::Offset<Telemetry::HandEquity>> equity_results_vec;
+                for (uint32_t i = 0; i < equity_snapshot.results_count && i < MAX_HANDS; i++) {
+                    auto hand_name = builder.CreateString(equity_snapshot.hand_names[i]);
+                    auto hand_equity = Telemetry::CreateHandEquity(
+                        builder,
+                        hand_name,
+                        equity_snapshot.results[i].equity,
+                        equity_snapshot.results[i].wins,
+                        equity_snapshot.results[i].ties,
+                        equity_snapshot.results[i].losses,
+                        equity_snapshot.results[i].simulations
+                    );
+                    equity_results_vec.push_back(hand_equity);
+                }
+
+                auto equity_results_fb = builder.CreateVector(equity_results_vec);
 
                 auto packet = Telemetry::CreateTelemetryPacket(
                     builder,
                     std::chrono::duration_cast<std::chrono::nanoseconds>(
                         std::chrono::system_clock::now().time_since_epoch()
                     ).count(),
-                    snapshot.hands_processed,
+                    telemetry_snapshot.hands_processed,
                     metrics.cpu_percent,
                     metrics.memory_rss_kb,
                     metrics.memory_vms_kb,
                     metrics.thread_count,
                     metrics.cpu_cycles,
-                    snapshot.status
+                    telemetry_snapshot.status,
+                    equity_results_fb
                 );
 
                 builder.Finish(packet);
@@ -82,14 +102,16 @@ int main(int argc, char* argv[]) {
                 );
                 ws_server.broadcast_binary(data);
 
-                if (snapshot.status == 1 || snapshot.status == 2 || kill(target_pid, 0) != 0) {
-                    std::cerr << "Job finished or process died. Status: " << static_cast<int>(snapshot.status) << std::endl;
+                if (telemetry_snapshot.status == 1 || telemetry_snapshot.status == 2 || kill(target_pid, 0) != 0) {
+                    std::cerr << "Job finished or process died. Status: " << static_cast<int>(telemetry_snapshot.status) << std::endl;
                     break;
                 }
 
                 packet_count++;
                 if (packet_count % 10 == 0) {
-                    std::cerr << "Packets sent: " << packet_count << ", hands: " << snapshot.hands_processed << std::endl;
+                    std::cerr << "Packets sent: " << packet_count
+                              << ", hands: " << telemetry_snapshot.hands_processed
+                              << ", equity results: " << equity_snapshot.results_count << std::endl;
                 }
             } catch (const std::exception& e) {
                 std::cerr << "Error reading shared memory: " << e.what() << std::endl;

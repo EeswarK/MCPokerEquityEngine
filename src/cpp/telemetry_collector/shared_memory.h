@@ -4,6 +4,30 @@
 #include <cstdint>
 #include <atomic>
 #include <string>
+#include <cstring>
+
+// Maximum number of poker hands in 13x13 matrix (pairs + suited + offsuit)
+#define MAX_HANDS 169
+
+// Per-hand equity result
+struct HandEquityResult {
+    double equity;        // Win rate (0.0 to 1.0)
+    uint32_t wins;        // Number of wins
+    uint32_t ties;        // Number of ties
+    uint32_t losses;      // Number of losses
+    uint32_t simulations; // Total simulations for this hand
+    uint32_t _padding;    // Align to 32 bytes
+};
+
+static_assert(sizeof(HandEquityResult) == 32, "HandEquityResult must be 32 bytes");
+
+// Equity results segment (follows telemetry struct in shared memory)
+struct EquityResultsSegment {
+    uint32_t seq;              // Sequence lock for results updates
+    uint32_t results_count;     // Number of valid results in array
+    char hand_names[MAX_HANDS][8];  // Hand names (e.g., "AA", "AKs", "72o")
+    HandEquityResult results[MAX_HANDS];  // Results array
+};
 
 // Shared memory structure for telemetry data
 // Uses sequence lock pattern to prevent torn reads on 64-bit integers
@@ -32,23 +56,36 @@ struct alignas(64) TelemetrySharedMemory {
 static_assert(sizeof(TelemetrySharedMemory) == 64, "Shared memory struct must be 64 bytes");
 static_assert(alignof(TelemetrySharedMemory) == 64, "Shared memory must be 64-byte aligned");
 
+// Complete shared memory layout
+struct CompleteSharedMemory {
+    TelemetrySharedMemory telemetry;
+    EquityResultsSegment equity_results;
+};
+
 struct TelemetrySnapshot {
     uint64_t hands_processed;
     uint64_t last_update_ns;
     uint8_t status;
 };
 
+struct EquityResultsSnapshot {
+    uint32_t results_count;
+    char hand_names[MAX_HANDS][8];
+    HandEquityResult results[MAX_HANDS];
+};
+
 class SharedMemoryReader {
 private:
     int shm_fd;
-    TelemetrySharedMemory* data;
+    CompleteSharedMemory* data;
     std::string shm_name;
 
 public:
     SharedMemoryReader(const std::string& job_id);
     ~SharedMemoryReader();
 
-    TelemetrySnapshot read_consistent() const;
+    TelemetrySnapshot read_telemetry_consistent() const;
+    EquityResultsSnapshot read_equity_consistent() const;
     bool is_valid() const;
     void cleanup();
 };

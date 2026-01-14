@@ -40,6 +40,19 @@ export function parseTelemetryPacket(
       status: packet.status(),
     };
 
+    // Extract equity results
+    const currentResults: Record<string, number> = {};
+    const equityResultsLength = packet.equityResultsLength();
+    for (let i = 0; i < equityResultsLength; i++) {
+      const handEquity = packet.equityResults(i);
+      if (handEquity) {
+        const handName = handEquity.handName();
+        if (handName) {
+          currentResults[handName] = handEquity.equity();
+        }
+      }
+    }
+
     const handsDelta = Number(data.hands_processed - previousHandsProcessed);
     const timeDeltaNs = Number(data.timestamp_ns - previousTimestampNs);
     const timeDeltaSeconds = timeDeltaNs / 1e9;
@@ -67,7 +80,7 @@ export function parseTelemetryPacket(
       job_id: jobId,
       status: jobStatus,
       progress: jobStatus === "completed" ? 1.0 : 0.0,
-      current_results: {},
+      current_results: currentResults,
       metrics,
       timestamp: new Date(
         Number(data.timestamp_ns / BigInt(1e6))

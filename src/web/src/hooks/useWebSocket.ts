@@ -41,11 +41,9 @@ export function useWebSocket(
         try {
           const message: WebSocketMessage = JSON.parse(event.data);
           if (message.type === "telemetry") {
-            // Merge with existing data to preserve metrics from C++ telemetry WebSocket
-            setData((prevData) => ({
-              ...message.data,
-              metrics: prevData?.metrics || message.data.metrics,
-            }));
+            // Python WebSocket no longer sends telemetry - all telemetry comes from C++
+            // This handler kept for backward compatibility but should not receive telemetry messages
+            console.warn("Received telemetry from Python WebSocket - this should not happen");
           } else if (message.type === "error") {
             setError(message.data.error);
           }
@@ -101,11 +99,8 @@ export function useWebSocket(
           );
 
           if (parsed) {
-            // Merge with existing data to preserve current_results from Python WebSocket
-            setData((prevData) => ({
-              ...parsed,
-              current_results: prevData?.current_results || parsed.current_results,
-            }));
+            // C++ telemetry now contains everything (metrics + equity results)
+            setData(parsed);
             const packetData = extractPacketData(event.data);
             if (packetData) {
               previousHandsProcessedRef.current = packetData.handsProcessed;
@@ -124,11 +119,8 @@ export function useWebSocket(
           );
 
           if (parsed) {
-            // Merge with existing data to preserve current_results from Python WebSocket
-            setData((prevData) => ({
-              ...parsed,
-              current_results: prevData?.current_results || parsed.current_results,
-            }));
+            // C++ telemetry now contains everything (metrics + equity results)
+            setData(parsed);
             const packetData = extractPacketData(arrayBuffer);
             if (packetData) {
               previousHandsProcessedRef.current = packetData.handsProcessed;

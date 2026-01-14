@@ -68,6 +68,10 @@ class EquityEngine:
                         self.shm_writer.update_hands(self.simulations_processed)
                         self.last_update_count = self.simulations_processed
 
+                # Update equity results in shared memory
+                if self.shm_writer:
+                    self.shm_writer.update_equity_results(results)
+
                 progress = (idx + 1) / total_hands
                 current_results = {name: result.equity for name, result in results.items()}
                 self._report_progress(progress, current_results)

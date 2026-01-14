@@ -1,5 +1,14 @@
 namespace Telemetry;
 
+table HandEquity {
+  hand_name:string;
+  equity:double;
+  wins:uint;
+  ties:uint;
+  losses:uint;
+  simulations:uint;
+}
+
 table TelemetryPacket {
   timestamp_ns:ulong;
   hands_processed:ulong;
@@ -9,6 +18,7 @@ table TelemetryPacket {
   thread_count:uint;
   cpu_cycles:ulong;
   status:ubyte;
+  equity_results:[HandEquity];
 }
 
 root_type TelemetryPacket;
