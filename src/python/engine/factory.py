@@ -1,9 +1,12 @@
 from typing import Optional
+
 from .engine import EquityEngine
 from .strategies.base import evaluate_hand_base, simulate_hand_base
 
 
-def create_engine(mode: str, num_workers: Optional[int] = None, job_id: Optional[str] = None) -> EquityEngine:
+def create_engine(
+    mode: str, num_workers: Optional[int] = None, job_id: Optional[str] = None
+) -> EquityEngine:
     if mode == "base_python":
         return EquityEngine(
             evaluate_hand=evaluate_hand_base,

@@ -71,6 +71,11 @@ target_include_directories(telemetry_collector PRIVATE
     ${ixwebsocket_SOURCE_DIR}
 )
 
+# Compile definitions
+target_compile_definitions(telemetry_collector PRIVATE
+    _GNU_SOURCE
+)
+
 # Link libraries
 # Note: FlatBuffers is header-only, no linking needed
 target_link_libraries(telemetry_collector PRIVATE

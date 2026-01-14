@@ -4,13 +4,58 @@
 #include <string>
 #include <unistd.h>
 #include <sys/resource.h>
+#include <sys/ioctl.h>
+#include <sys/syscall.h>
+#include <linux/perf_event.h>
+#include <asm/unistd.h>
+#include <cerrno>
+#include <cstring>
 #include <chrono>
+#include <iostream>
 
 MetricsCollector::MetricsCollector(pid_t pid)
     : target_pid(pid), perf_fd(-1), last_utime(0), last_stime(0), last_timestamp_ns(0) {}
 
 bool MetricsCollector::initialize() {
-    perf_fd = -1;
+    std::ifstream paranoid_file("/proc/sys/kernel/perf_event_paranoid");
+    if (paranoid_file.is_open()) {
+        int paranoid_level;
+        paranoid_file >> paranoid_level;
+        if (paranoid_level > 1) {
+            std::cerr << "Warning: perf_event_paranoid=" << paranoid_level
+                      << " (need <=1 for non-root). CPU cycles will be 0." << std::endl;
+            perf_fd = -1;
+            return true;
+        }
+    }
+
+    struct perf_event_attr attr;
+    memset(&attr, 0, sizeof(attr));
+    attr.type = PERF_TYPE_HARDWARE;
+    attr.size = sizeof(attr);
+    attr.config = PERF_COUNT_HW_CPU_CYCLES;
+    attr.disabled = 1;
+    attr.exclude_kernel = 1;
+    attr.exclude_hv = 1;
+    attr.inherit = 1;
+
+    perf_fd = syscall(__NR_perf_event_open, &attr, target_pid, -1, -1, 0);
+
+    if (perf_fd < 0) {
+        std::cerr << "Warning: perf_event_open failed (errno=" << errno
+                  << "). CPU cycles will be 0." << std::endl;
+        perf_fd = -1;
+        return true;
+    }
+
+    if (ioctl(perf_fd, PERF_EVENT_IOC_ENABLE, 0) < 0) {
+        std::cerr << "Warning: Failed to enable perf_event (errno=" << errno
+                  << "). CPU cycles will be 0." << std::endl;
+        close(perf_fd);
+        perf_fd = -1;
+        return true;
+    }
+
     return true;
 }
 
@@ -90,6 +135,18 @@ ProcessMetrics MetricsCollector::collect() {
         }
     }
 
+    if (perf_fd >= 0) {
+        uint64_t cycles;
+        ssize_t bytes_read = read(perf_fd, &cycles, sizeof(cycles));
+        if (bytes_read == sizeof(cycles)) {
+            metrics.cpu_cycles = cycles;
+        } else {
+            metrics.cpu_cycles = 0;
+        }
+    } else {
+        metrics.cpu_cycles = 0;
+    }
+
     return metrics;
 }
 
@@ -99,6 +156,7 @@ MetricsCollector::~MetricsCollector() {
 
 void MetricsCollector::cleanup() {
     if (perf_fd >= 0) {
+        ioctl(perf_fd, PERF_EVENT_IOC_DISABLE, 0);
         close(perf_fd);
         perf_fd = -1;
     }
