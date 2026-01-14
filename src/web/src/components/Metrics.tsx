@@ -62,6 +62,14 @@ export const Metrics: React.FC<MetricsProps> = ({ metrics, history }) => {
                 <p className="text-sm font-medium">{metrics.num_workers}</p>
               </div>
             )}
+            {metrics.cpu_cycles !== undefined && metrics.cpu_cycles > 0 && (
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">CPU Cycles:</p>
+                <p className="text-sm font-medium">
+                  {metrics.cpu_cycles.toLocaleString()}
+                </p>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
