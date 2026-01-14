@@ -29,7 +29,7 @@ class EquityEngine:
                 logging.warning(f"Failed to create shared memory for job {job_id}")
                 self.shm_writer = None
         self.simulations_processed = 0
-        self.update_frequency = 10000
+        self.update_frequency = 1000
         self.last_update_count = 0
 
     def set_progress_callback(self, callback: Callable[[float, Dict[str, float]], None]):

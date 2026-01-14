@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <atomic>
+#include <string>
 
 // Shared memory structure for telemetry data
 // Uses sequence lock pattern to prevent torn reads on 64-bit integers
@@ -30,5 +31,26 @@ struct alignas(64) TelemetrySharedMemory {
 // Size must be exactly one cache line (64 bytes) for cache coherency
 static_assert(sizeof(TelemetrySharedMemory) == 64, "Shared memory struct must be 64 bytes");
 static_assert(alignof(TelemetrySharedMemory) == 64, "Shared memory must be 64-byte aligned");
+
+struct TelemetrySnapshot {
+    uint64_t hands_processed;
+    uint64_t last_update_ns;
+    uint8_t status;
+};
+
+class SharedMemoryReader {
+private:
+    int shm_fd;
+    TelemetrySharedMemory* data;
+    std::string shm_name;
+
+public:
+    SharedMemoryReader(const std::string& job_id);
+    ~SharedMemoryReader();
+
+    TelemetrySnapshot read_consistent() const;
+    bool is_valid() const;
+    void cleanup();
+};
 
 #endif // SHARED_MEMORY_H
