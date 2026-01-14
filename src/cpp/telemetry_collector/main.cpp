@@ -30,23 +30,30 @@ int main(int argc, char* argv[]) {
     signal(SIGTERM, signal_handler);
 
     try {
+        std::cerr << "Opening shared memory for job: " << job_id << std::endl;
         SharedMemoryReader shm_reader(job_id);
+        std::cerr << "Shared memory opened successfully" << std::endl;
+
         MetricsCollector metrics_collector(target_pid);
         metrics_collector.initialize();
 
+        std::cerr << "Connecting to WebSocket: " << websocket_url << std::endl;
         WebSocketClient ws_client(websocket_url);
         if (!ws_client.connect()) {
             std::cerr << "Failed to connect to WebSocket" << std::endl;
             return 1;
         }
+        std::cerr << "WebSocket connected" << std::endl;
 
         auto next_tick = std::chrono::steady_clock::now();
         const auto interval = std::chrono::milliseconds(100);
+        int packet_count = 0;
 
         while (running) {
             next_tick += interval;
 
-            auto snapshot = shm_reader.read_consistent();
+            try {
+                auto snapshot = shm_reader.read_consistent();
 
             ProcessMetrics metrics = metrics_collector.collect();
 
@@ -74,19 +81,31 @@ int main(int argc, char* argv[]) {
             );
             ws_client.send_binary(data);
 
-            if (snapshot.status == 1 || snapshot.status == 2 || kill(target_pid, 0) != 0) {
+                if (snapshot.status == 1 || snapshot.status == 2 || kill(target_pid, 0) != 0) {
+                    std::cerr << "Job finished or process died. Status: " << static_cast<int>(snapshot.status) << std::endl;
+                    break;
+                }
+
+                packet_count++;
+                if (packet_count % 10 == 0) {
+                    std::cerr << "Packets sent: " << packet_count << ", hands: " << snapshot.hands_processed << std::endl;
+                }
+            } catch (const std::exception& e) {
+                std::cerr << "Error reading shared memory: " << e.what() << std::endl;
                 break;
             }
 
             std::this_thread::sleep_until(next_tick);
         }
 
+        std::cerr << "Shutting down. Total packets: " << packet_count << std::endl;
         metrics_collector.cleanup();
         ws_client.close();
         shm_reader.cleanup();
+        std::cerr << "Cleanup complete" << std::endl;
 
     } catch (const std::exception& e) {
-        std::cerr << "Error: " << e.what() << std::endl;
+        std::cerr << "Fatal error: " << e.what() << std::endl;
         return 1;
     }
 
