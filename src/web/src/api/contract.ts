@@ -13,6 +13,7 @@ export interface CreateJobResponse {
   job_id: string;
   status: JobStatus;
   created_at: string; // ISO 8601 timestamp
+  telemetry_ws_url?: string;
 }
 
 export interface JobStatusResponse {

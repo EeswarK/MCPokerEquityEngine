@@ -2,12 +2,15 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { TelemetryUpdate, WebSocketMessage } from "../api/contract";
 import { apiClient } from "../api/client";
 
-export function useWebSocket(jobId: string | null) {
+export function useWebSocket(jobId: string | null, telemetryWsUrl: string | null) {
   const [data, setData] = useState<TelemetryUpdate | null>(null);
   const [connected, setConnected] = useState(false);
+  const [telemetryConnected, setTelemetryConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const telemetryWsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
+  const telemetryReconnectTimeoutRef = useRef<number | null>(null);
 
   const connect = useCallback(() => {
     if (!jobId) return;
@@ -46,7 +49,6 @@ export function useWebSocket(jobId: string | null) {
 
       ws.onclose = () => {
         setConnected(false);
-        // Attempt reconnect after 2 seconds if job is still active
         if (jobId) {
           reconnectTimeoutRef.current = window.setTimeout(() => {
             connect();
@@ -59,17 +61,65 @@ export function useWebSocket(jobId: string | null) {
     }
   }, [jobId]);
 
+  const connectTelemetry = useCallback(() => {
+    if (!telemetryWsUrl) return;
+
+    try {
+      const ws = new WebSocket(telemetryWsUrl);
+      telemetryWsRef.current = ws;
+
+      ws.onopen = () => {
+        setTelemetryConnected(true);
+        if (telemetryReconnectTimeoutRef.current) {
+          clearTimeout(telemetryReconnectTimeoutRef.current);
+          telemetryReconnectTimeoutRef.current = null;
+        }
+      };
+
+      ws.onmessage = (event) => {
+        if (event.data instanceof ArrayBuffer || event.data instanceof Blob) {
+          console.log("Received binary telemetry data:", event.data.byteLength || (event.data as Blob).size, "bytes");
+        }
+      };
+
+      ws.onerror = (err) => {
+        console.warn("Telemetry WebSocket error (non-fatal):", err);
+        setTelemetryConnected(false);
+      };
+
+      ws.onclose = () => {
+        setTelemetryConnected(false);
+        if (telemetryWsUrl) {
+          telemetryReconnectTimeoutRef.current = window.setTimeout(() => {
+            connectTelemetry();
+          }, 2000);
+        }
+      };
+    } catch (err) {
+      console.warn("Failed to create telemetry WebSocket (non-fatal):", err);
+    }
+  }, [telemetryWsUrl]);
+
   useEffect(() => {
     connect();
+    if (telemetryWsUrl) {
+      connectTelemetry();
+    }
     return () => {
       if (wsRef.current) {
         wsRef.current.close();
       }
+      if (telemetryWsRef.current) {
+        telemetryWsRef.current.close();
+      }
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
       }
+      if (telemetryReconnectTimeoutRef.current) {
+        clearTimeout(telemetryReconnectTimeoutRef.current);
+      }
     };
-  }, [connect]);
+  }, [connect, connectTelemetry]);
 
-  return { data, connected, error };
+  return { data, connected, telemetryConnected, error };
 }

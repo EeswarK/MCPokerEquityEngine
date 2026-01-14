@@ -1,11 +1,8 @@
-from fastapi import WebSocket, WebSocketDisconnect, status
-from typing import Dict, Set, Optional
-import json
 import asyncio
 from queue import Queue
-from datetime import datetime
+from typing import Dict, Optional, Set
 
-from .job_manager import JobManager
+from fastapi import WebSocket
 
 
 class ConnectionManager:
@@ -22,10 +19,13 @@ class ConnectionManager:
     async def _broadcast_worker(self):
         while True:
             try:
-                job_id, message = await asyncio.to_thread(
-                    self._broadcast_queue.get, True, 1.0
-                )
-                await self._send_to_job(job_id, message)
+                item = await asyncio.to_thread(self._broadcast_queue.get, True, 1.0)
+                if len(item) == 3:
+                    job_id, message, is_binary = item
+                    await self._send_to_job(job_id, message, is_binary)
+                else:
+                    job_id, message = item
+                    await self._send_to_job(job_id, message, False)
                 self._broadcast_queue.task_done()
             except:
                 await asyncio.sleep(0.1)
@@ -50,14 +50,20 @@ class ConnectionManager:
     def broadcast(self, job_id: str, message: str):
         self._broadcast_queue.put((job_id, message))
 
-    async def _send_to_job(self, job_id: str, message: str):
+    def broadcast_binary(self, job_id: str, message: bytes):
+        self._broadcast_queue.put((job_id, message, True))
+
+    async def _send_to_job(self, job_id: str, message, is_binary: bool = False):
         async with self._lock:
             connections = self.active_connections.get(job_id, set()).copy()
 
         disconnected = set()
         for connection in connections:
             try:
-                await connection.send_text(message)
+                if is_binary:
+                    await connection.send_bytes(message)
+                else:
+                    await connection.send_text(message)
             except Exception:
                 disconnected.add(connection)
 

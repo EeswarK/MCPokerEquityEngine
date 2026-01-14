@@ -51,14 +51,14 @@ set(SOURCES
     main.cpp
     shared_memory.cpp
     metrics_collector.cpp
-    websocket_client.cpp
+    websocket_server.cpp
 )
 
 # Header files
 set(HEADERS
     shared_memory.h
     metrics_collector.h
-    websocket_client.h
+    websocket_server.h
 )
 
 # Create executable

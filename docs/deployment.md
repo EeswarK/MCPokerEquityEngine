@@ -58,6 +58,8 @@ Access at http://localhost:3000
 
 ## Environment Variables
 
+### Frontend
+
 Create a `.env` file in `src/web/` (or use `.env.example` as a template):
 
 ```bash
@@ -68,6 +70,17 @@ VITE_WS_URL=ws://localhost:8000
 # Development
 VITE_USE_MOCK=true
 ```
+
+### Backend (Python API)
+
+- `TELEMETRY_PORT` (default: 8001): Port for C++ telemetry collector WebSocket server (only used for direct connections, not when proxied through nginx)
+- `TELEMETRY_HOST` (default: localhost): Hostname for telemetry WebSocket URL in job responses (use nginx hostname when proxied)
+- `TELEMETRY_WS_PROTOCOL` (default: ws): WebSocket protocol - use "wss" when proxied through nginx with SSL
+- `TELEMETRY_COLLECTOR_BINARY`: Path to telemetry collector executable (default: relative path in source)
+
+### Python API
+
+- `API_PORT` (default: 8000): Port for Python FastAPI server
 
 ## Troubleshooting
 

@@ -5,10 +5,11 @@ import { useWebSocket } from "./useWebSocket";
 
 export function useJob() {
   const [jobId, setJobId] = useState<string | null>(null);
+  const [telemetryWsUrl, setTelemetryWsUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { data: telemetry, connected } = useWebSocket(jobId);
+  const { data: telemetry, connected, telemetryConnected } = useWebSocket(jobId, telemetryWsUrl);
 
   const submitJob = useCallback(async (request: CreateJobRequest) => {
     setLoading(true);
@@ -17,11 +18,13 @@ export function useJob() {
     try {
       const response: CreateJobResponse = await apiClient.createJob(request);
       setJobId(response.job_id);
+      setTelemetryWsUrl(response.telemetry_ws_url || null);
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "Failed to create job";
       setError(errorMessage);
       setJobId(null);
+      setTelemetryWsUrl(null);
     } finally {
       setLoading(false);
     }
@@ -29,6 +32,7 @@ export function useJob() {
 
   const resetJob = useCallback(() => {
     setJobId(null);
+    setTelemetryWsUrl(null);
     setError(null);
   }, []);
 
@@ -40,5 +44,6 @@ export function useJob() {
     error,
     telemetry,
     connected,
+    telemetryConnected,
   };
 }
