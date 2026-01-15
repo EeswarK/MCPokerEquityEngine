@@ -56,20 +56,19 @@ class EquityEngine:
                     request.board,
                     request.num_opponents,
                     simulations_per_hand,
+                    hand_name,
+                    results,
                 )
-                equity_result.hand_name = hand_name
                 results[hand_name] = equity_result
-                self.simulations_processed += simulations_per_hand
+                # Note: simulations_processed is now updated inside _calculate_hand_equity
 
+                # Final update for this hand with complete results
                 if self.shm_writer:
-                    if (
-                        self.simulations_processed - self.last_update_count
-                    ) >= self.update_frequency:
-                        self.shm_writer.update_hands(self.simulations_processed)
-                        self.last_update_count = self.simulations_processed
-
-                # Update equity results in shared memory
-                if self.shm_writer:
+                    # Ensure hands_processed reflects the total for this hand
+                    expected_total = (idx + 1) * simulations_per_hand
+                    if self.simulations_processed < expected_total:
+                        self.simulations_processed = expected_total
+                    self.shm_writer.update_hands(self.simulations_processed)
                     self.shm_writer.update_equity_results(results)
 
                 progress = (idx + 1) / total_hands
@@ -95,12 +94,15 @@ class EquityEngine:
         board: list[Card],
         num_opponents: int,
         num_simulations: int,
+        hand_name: str = "",
+        results: Optional[Dict[str, EquityResult]] = None,
     ) -> EquityResult:
         wins = 0
         ties = 0
         losses = 0
+        update_interval = 1000  # Update shared memory every 1000 simulations
 
-        for _ in range(num_simulations):
+        for sim_num in range(num_simulations):
             outcome = self.simulate_hand(hole_cards, board, num_opponents)
             if outcome == 1:
                 wins += 1
@@ -109,11 +111,34 @@ class EquityEngine:
             else:
                 losses += 1
 
+            # Periodically update shared memory with partial results
+            if self.shm_writer and results is not None and hand_name and (sim_num + 1) % update_interval == 0:
+                total = wins + ties + losses
+                equity = (wins + ties * 0.5) / total if total > 0 else 0.0
+
+                # Update hands processed counter
+                self.simulations_processed += update_interval
+                if (self.simulations_processed - self.last_update_count) >= self.update_frequency:
+                    self.shm_writer.update_hands(self.simulations_processed)
+                    self.last_update_count = self.simulations_processed
+
+                # Update partial equity results
+                partial_result = EquityResult(
+                    hand_name=hand_name,
+                    equity=equity,
+                    wins=wins,
+                    ties=ties,
+                    losses=losses,
+                    total_simulations=sim_num + 1,
+                )
+                results[hand_name] = partial_result
+                self.shm_writer.update_equity_results(results)
+
         total = wins + ties + losses
         equity = (wins + ties * 0.5) / total if total > 0 else 0.0
 
         return EquityResult(
-            hand_name="",
+            hand_name=hand_name,
             equity=equity,
             wins=wins,
             ties=ties,

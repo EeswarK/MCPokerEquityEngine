@@ -42,29 +42,64 @@ export function parseTelemetryPacket(
       status: packet.status(),
     };
 
-    // Extract equity results
+    // Helper function to convert specific hands (e.g., "AsKh") to general types (e.g., "AKs")
+    const normalizeHandName = (handName: string): string => {
+      if (!handName || handName.length < 2) return handName;
+
+      // Parse hand name (e.g., "AsKh" or "AA" or "AKs")
+      // If it's already a general type (2-3 chars), return as-is
+      if (handName.length <= 3) return handName;
+
+      // Extract ranks and suits from specific hand (e.g., "AsKh" -> A, s, K, h)
+      const rank1Char = handName[0];
+      const suit1Char = handName[1];
+      const rank2Char = handName[2];
+      const suit2Char = handName[3];
+
+      // Check if it's a pair
+      if (rank1Char === rank2Char) {
+        return `${rank1Char}${rank1Char}`;
+      }
+
+      // Check if suited (same suit)
+      const suited = suit1Char === suit2Char;
+
+      // Sort ranks (higher rank first)
+      const ranks = [rank1Char, rank2Char];
+      const rankOrder = "23456789TJQKA";
+      ranks.sort((a, b) => rankOrder.indexOf(b) - rankOrder.indexOf(a));
+
+      return `${ranks[0]}${ranks[1]}${suited ? "s" : "o"}`;
+    };
+
+    // Extract equity results and sample counts
     const currentResults: Record<string, number> = {};
+    const sampleCounts: Record<string, number> = {};
     const equityResultsLength = packet.equityResultsLength();
+
     for (let i = 0; i < equityResultsLength; i++) {
       const handEquity = packet.equityResults(i);
       if (handEquity) {
-        const handName = handEquity.handName();
-        if (handName) {
-          currentResults[handName] = handEquity.equity();
+        const originalHandName = handEquity.handName();
+        if (originalHandName) {
+          // Normalize hand name for heatmap display
+          const normalizedHandName = normalizeHandName(originalHandName);
+          currentResults[normalizedHandName] = handEquity.equity();
+          sampleCounts[normalizedHandName] = handEquity.simulations();
         }
       }
     }
 
-    const handsDelta = Number(data.hands_processed - previousHandsProcessed);
-    const timeDeltaNs = Number(data.timestamp_ns - previousTimestampNs);
+    // Use cumulative calculation instead of delta for smoother, more stable metrics
+    // This avoids the spike on first packet and smooths out noisy delta calculations
+    const totalHandsProcessed = Number(data.hands_processed);
+    const totalTimeElapsedNs = Number(data.timestamp_ns - data.job_start_ns);
+    const totalTimeElapsedSeconds = totalTimeElapsedNs / 1e9;
 
-    // For first packet, use small epsilon instead of zero to avoid division issues
-    const timeDeltaSeconds = previousTimestampNs === BigInt(0)
-      ? 0.001  // First packet: assume 1ms elapsed
-      : timeDeltaNs / 1e9;
-
+    // Calculate cumulative simulations per second
+    // This gives a smooth average over the entire job duration
     const simulationsPerSecond =
-      timeDeltaSeconds > 0 ? handsDelta / timeDeltaSeconds : 0;
+      totalTimeElapsedSeconds > 0 ? totalHandsProcessed / totalTimeElapsedSeconds : 0;
 
     const statusMap: Record<number, JobStatus> = {
       0: "running",
@@ -88,6 +123,7 @@ export function parseTelemetryPacket(
       status: jobStatus,
       progress: jobStatus === "completed" ? 1.0 : 0.0,
       current_results: currentResults,
+      sample_counts: sampleCounts,
       metrics,
       timestamp: new Date(
         Number(data.timestamp_ns / BigInt(1e6))

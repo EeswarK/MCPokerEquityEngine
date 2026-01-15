@@ -1,7 +1,7 @@
-from pydantic import BaseModel, Field, field_validator
-from typing import Dict, List, Optional
 from enum import Enum
-from datetime import datetime
+from typing import Dict, List, Optional
+
+from pydantic import BaseModel, Field, field_validator
 
 from ..models.card import Card
 from ..models.job import JobRequest as InternalJobRequest

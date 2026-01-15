@@ -4,33 +4,52 @@ import { Heatmap } from "./components/Heatmap";
 import { Metrics } from "./components/Metrics";
 import { JobStatusDisplay } from "./components/JobStatus";
 import { ThemeToggle } from "./components/ThemeToggle";
+import { CardPicker } from "./components/CardPicker";
 import { useJob } from "./hooks/useJob";
-import { EngineMode } from "./types";
+import { EngineMode, Card as CardType } from "./types";
 import { Button } from "./components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 
 function App() {
   const [mode, setMode] = useState<EngineMode>("base_python");
   const [numWorkers, setNumWorkers] = useState(4);
-  const { jobId, submitJob, resetJob, loading, error, telemetry, connected, telemetryConnected } =
-    useJob();
+  const [card1, setCard1] = useState<CardType | null>(null);
+  const [card2, setCard2] = useState<CardType | null>(null);
+  const {
+    jobId,
+    submitJob,
+    resetJob,
+    loading,
+    error,
+    telemetry,
+    connected,
+    telemetryConnected,
+  } = useJob();
 
   const handleSubmit = async () => {
-    // Mock range spec for now
+    if (!card1 || !card2) {
+      alert("Please select both hole cards");
+      return;
+    }
+
+    // Generate hand name (e.g., "AsKh" for specific cards)
+    const rankToChar = (rank: number) => {
+      if (rank <= 10) return rank.toString();
+      const map: Record<number, string> = {
+        11: "J",
+        12: "Q",
+        13: "K",
+        14: "A",
+      };
+      return map[rank] || rank.toString();
+    };
+
+    const suitToChar = (suit: number) => ["h", "d", "c", "s"][suit] || "?";
+
+    const handName = `${rankToChar(card1.rank)}${suitToChar(card1.suit)}${rankToChar(card2.rank)}${suitToChar(card2.suit)}`;
+
     const rangeSpec = {
-      AA: [
-        { rank: 14, suit: 0 },
-        { rank: 14, suit: 1 },
-      ],
-      KK: [
-        { rank: 13, suit: 0 },
-        { rank: 13, suit: 1 },
-      ],
-      QQ: [
-        { rank: 12, suit: 0 },
-        { rank: 12, suit: 1 },
-      ],
-      // Add more hands as needed
+      [handName]: [card1, card2],
     };
 
     await submitJob({
@@ -53,15 +72,21 @@ function App() {
   // Accumulate history when telemetry updates
   useEffect(() => {
     if (telemetry && telemetry.metrics.simulations_per_second > 0) {
-      setMetricsHistory((prev) => [
-        ...prev,
-        {
-          time: prev.length,  // Sequential index for x-axis
-          value: telemetry.metrics.simulations_per_second,
-        },
-      ]);
+      // Filter out first few data points if they're unreasonably high (warm-up artifacts)
+      // Typical values should be in the 1k-100k range for most hardware
+      const isReasonableValue = telemetry.metrics.simulations_per_second < 500000;
+
+      if (isReasonableValue) {
+        setMetricsHistory((prev) => [
+          ...prev,
+          {
+            time: prev.length, // Sequential index for x-axis
+            value: telemetry.metrics.simulations_per_second,
+          },
+        ]);
+      }
     }
-  }, [telemetry?.timestamp]);  // Trigger on new telemetry
+  }, [telemetry?.timestamp]); // Trigger on new telemetry
 
   // Reset history when job resets
   useEffect(() => {
@@ -86,6 +111,23 @@ function App() {
             <CardTitle>Simulation Controls</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <CardPicker
+                  label="Card 1"
+                  value={card1}
+                  onChange={setCard1}
+                  excludeCards={card2 ? [card2] : []}
+                />
+                <CardPicker
+                  label="Card 2"
+                  value={card2}
+                  onChange={setCard2}
+                  excludeCards={card1 ? [card1] : []}
+                />
+              </div>
+            </div>
+
             <ModeSelector
               mode={mode}
               onChange={setMode}
@@ -95,7 +137,10 @@ function App() {
             />
 
             <div className="flex gap-2">
-              <Button onClick={handleSubmit} disabled={loading || !!jobId}>
+              <Button
+                onClick={handleSubmit}
+                disabled={loading || !!jobId || !card1 || !card2}
+              >
                 {loading ? "Starting..." : "Run Simulation"}
               </Button>
               {jobId && (
@@ -144,6 +189,7 @@ function App() {
               <CardContent>
                 <Heatmap
                   data={telemetry.current_results}
+                  sampleCounts={telemetry.sample_counts}
                   isLoading={telemetry.status === "running"}
                 />
               </CardContent>
