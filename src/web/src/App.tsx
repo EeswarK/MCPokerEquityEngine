@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { ModeSelector } from "./components/ModeSelector";
 import { Heatmap } from "./components/Heatmap";
 import { Metrics } from "./components/Metrics";
@@ -45,16 +45,30 @@ function App() {
     });
   };
 
-  const metricsHistory = useMemo(() => {
-    if (!telemetry) return [];
-    // Build history from telemetry updates
-    return [
-      {
-        time: new Date(telemetry.timestamp).getTime(),
-        value: telemetry.metrics.simulations_per_second,
-      },
-    ];
-  }, [telemetry]);
+  // State for history accumulation
+  const [metricsHistory, setMetricsHistory] = useState<
+    Array<{ time: number; value: number }>
+  >([]);
+
+  // Accumulate history when telemetry updates
+  useEffect(() => {
+    if (telemetry && telemetry.metrics.simulations_per_second > 0) {
+      setMetricsHistory((prev) => [
+        ...prev,
+        {
+          time: prev.length,  // Sequential index for x-axis
+          value: telemetry.metrics.simulations_per_second,
+        },
+      ]);
+    }
+  }, [telemetry?.timestamp]);  // Trigger on new telemetry
+
+  // Reset history when job resets
+  useEffect(() => {
+    if (!jobId) {
+      setMetricsHistory([]);
+    }
+  }, [jobId]);
 
   return (
     <div className="mx-auto max-w-[1400px] p-8">

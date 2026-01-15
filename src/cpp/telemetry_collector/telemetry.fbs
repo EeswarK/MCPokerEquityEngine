@@ -11,6 +11,7 @@ table HandEquity {
 
 table TelemetryPacket {
   timestamp_ns:ulong;
+  job_start_ns:ulong;
   hands_processed:ulong;
   cpu_percent:double;
   memory_rss_kb:ulong;

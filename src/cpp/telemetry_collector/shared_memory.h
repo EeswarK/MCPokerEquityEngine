@@ -39,6 +39,9 @@ struct alignas(64) TelemetrySharedMemory {
 
     uint32_t _padding1;  // Align next field to 8-byte boundary
 
+    // Job start timestamp (nanoseconds since epoch)
+    uint64_t job_start_ns;
+
     // Atomic counter for hands processed (updated by evaluator)
     uint64_t hands_processed;
 
@@ -49,7 +52,7 @@ struct alignas(64) TelemetrySharedMemory {
     uint8_t status;
 
     // Reserved for future use (padding to cache line size)
-    uint8_t _reserved[39];
+    uint8_t _reserved[31];
 };
 
 // Size must be exactly one cache line (64 bytes) for cache coherency
@@ -63,6 +66,7 @@ struct CompleteSharedMemory {
 };
 
 struct TelemetrySnapshot {
+    uint64_t job_start_ns;
     uint64_t hands_processed;
     uint64_t last_update_ns;
     uint8_t status;

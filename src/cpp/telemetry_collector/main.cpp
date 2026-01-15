@@ -84,6 +84,7 @@ int main(int argc, char* argv[]) {
                     std::chrono::duration_cast<std::chrono::nanoseconds>(
                         std::chrono::system_clock::now().time_since_epoch()
                     ).count(),
+                    telemetry_snapshot.job_start_ns,
                     telemetry_snapshot.hands_processed,
                     metrics.cpu_percent,
                     metrics.memory_rss_kb,

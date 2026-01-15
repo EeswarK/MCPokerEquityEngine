@@ -1,5 +1,5 @@
 import * as flatbuffers from "flatbuffers";
-import { Telemetry } from "../api/telemetry_generated";
+import { TelemetryPacket } from "../api/telemetry/telemetry-packet.js";
 import {
   PerformanceMetrics,
   TelemetryUpdate,
@@ -8,6 +8,7 @@ import {
 
 interface BinaryTelemetryData {
   timestamp_ns: bigint;
+  job_start_ns: bigint;
   hands_processed: bigint;
   cpu_percent: number;
   memory_rss_kb: bigint;
@@ -27,10 +28,11 @@ export function parseTelemetryPacket(
     const bytes = new Uint8Array(buffer);
     const bb = new flatbuffers.ByteBuffer(bytes);
 
-    const packet = Telemetry.TelemetryPacket.getRootAsTelemetryPacket(bb);
+    const packet = TelemetryPacket.getRootAsTelemetryPacket(bb);
 
     const data: BinaryTelemetryData = {
       timestamp_ns: packet.timestampNs(),
+      job_start_ns: packet.jobStartNs(),
       hands_processed: packet.handsProcessed(),
       cpu_percent: packet.cpuPercent(),
       memory_rss_kb: packet.memoryRssKb(),
@@ -55,7 +57,12 @@ export function parseTelemetryPacket(
 
     const handsDelta = Number(data.hands_processed - previousHandsProcessed);
     const timeDeltaNs = Number(data.timestamp_ns - previousTimestampNs);
-    const timeDeltaSeconds = timeDeltaNs / 1e9;
+
+    // For first packet, use small epsilon instead of zero to avoid division issues
+    const timeDeltaSeconds = previousTimestampNs === BigInt(0)
+      ? 0.001  // First packet: assume 1ms elapsed
+      : timeDeltaNs / 1e9;
+
     const simulationsPerSecond =
       timeDeltaSeconds > 0 ? handsDelta / timeDeltaSeconds : 0;
 
@@ -68,7 +75,7 @@ export function parseTelemetryPacket(
 
     const metrics: PerformanceMetrics = {
       mode: "base_python",
-      duration_seconds: Number(data.timestamp_ns) / 1e9,
+      duration_seconds: Number(data.timestamp_ns - data.job_start_ns) / 1e9,
       simulations_per_second: simulationsPerSecond,
       cpu_percent: data.cpu_percent,
       memory_mb: Number(data.memory_rss_kb) / 1024,
@@ -101,7 +108,7 @@ export function extractPacketData(buffer: ArrayBuffer): {
   try {
     const bytes = new Uint8Array(buffer);
     const bb = new flatbuffers.ByteBuffer(bytes);
-    const packet = Telemetry.TelemetryPacket.getRootAsTelemetryPacket(bb);
+    const packet = TelemetryPacket.getRootAsTelemetryPacket(bb);
     return {
       handsProcessed: packet.handsProcessed(),
       timestampNs: packet.timestampNs(),

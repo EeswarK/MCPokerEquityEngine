@@ -33,10 +33,11 @@ class TelemetrySharedMemory(Structure):
     _fields_ = [
         ("seq", c_uint32),
         ("_padding1", c_uint32),
+        ("job_start_ns", c_uint64),
         ("hands_processed", c_uint64),
         ("last_update_ns", c_uint64),
         ("status", c_uint8),
-        ("_reserved", c_uint8 * 39),
+        ("_reserved", c_uint8 * 31),
     ]
 
 
@@ -68,6 +69,7 @@ class SharedMemoryWriter:
 
             self.data = CompleteSharedMemory.from_buffer(self.shm_mmap)
             self.data.telemetry.seq = 0
+            self.data.telemetry.job_start_ns = int(time.time_ns())
             self.data.telemetry.hands_processed = 0
             self.data.telemetry.last_update_ns = int(time.time_ns())
             self.data.telemetry.status = 0
