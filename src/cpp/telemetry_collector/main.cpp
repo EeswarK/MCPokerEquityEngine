@@ -64,15 +64,24 @@ int main(int argc, char* argv[]) {
                 // Build equity results vector
                 std::vector<flatbuffers::Offset<Telemetry::HandEquity>> equity_results_vec;
                 for (uint32_t i = 0; i < equity_snapshot.results_count && i < MAX_HANDS; i++) {
-                    auto hand_name = builder.CreateString(equity_snapshot.hand_names[i]);
-                    auto hand_equity = Telemetry::CreateHandEquity(
+                    // Flatten win-method matrix (10x10 -> 100 element vector)
+                    std::vector<uint32_t> matrix_flat;
+                    matrix_flat.reserve(100);
+                    for (int our_type = 0; our_type < 10; our_type++) {
+                        for (int opp_type = 0; opp_type < 10; opp_type++) {
+                            matrix_flat.push_back(equity_snapshot.results[i].win_method_matrix[our_type][opp_type]);
+                        }
+                    }
+
+                    auto hand_equity = Telemetry::CreateHandEquityDirect(
                         builder,
-                        hand_name,
+                        equity_snapshot.hand_names[i],
                         equity_snapshot.results[i].equity,
                         equity_snapshot.results[i].wins,
                         equity_snapshot.results[i].ties,
                         equity_snapshot.results[i].losses,
-                        equity_snapshot.results[i].simulations
+                        equity_snapshot.results[i].simulations,
+                        &matrix_flat
                     );
                     equity_results_vec.push_back(hand_equity);
                 }

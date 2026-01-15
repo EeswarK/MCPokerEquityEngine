@@ -7,6 +7,7 @@ table HandEquity {
   ties:uint;
   losses:uint;
   simulations:uint;
+  win_method_matrix:[uint];  // Flattened 10x10 matrix (100 elements): [our_type * 10 + opp_type]
 }
 
 table TelemetryPacket {

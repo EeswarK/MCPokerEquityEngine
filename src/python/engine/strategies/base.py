@@ -27,7 +27,16 @@ def evaluate_hand_base(hole_cards: list[Card], board_cards: list[Card]) -> int:
     return best_value
 
 
-def simulate_hand_base(hole_cards: list[Card], board: list[Card], num_opponents: int) -> int:
+def simulate_hand_base(hole_cards: list[Card], board: list[Card], num_opponents: int) -> tuple[int, int, int]:
+    """
+    Simulate a poker hand and return outcome with hand type information.
+
+    Returns:
+        tuple[int, int, int]: (outcome, our_hand_type, max_opponent_hand_type)
+        - outcome: 1=win, 0=tie, -1=loss
+        - our_hand_type: 0-9 (High Card to Royal Flush)
+        - max_opponent_hand_type: 0-9 (High Card to Royal Flush)
+    """
     deck = _create_deck()
     known_cards = set((c.rank, c.suit) for c in hole_cards + board)
 
@@ -39,7 +48,7 @@ def simulate_hand_base(hole_cards: list[Card], board: list[Card], num_opponents:
 
     for _ in range(remaining_board):
         if not deck:
-            return 0
+            return (0, 0, 0)
         card_tuple = random.choice(list(deck))
         deck.discard(card_tuple)
         board_cards.append(Card(rank=card_tuple[0], suit=card_tuple[1]))
@@ -47,7 +56,7 @@ def simulate_hand_base(hole_cards: list[Card], board: list[Card], num_opponents:
     opponent_hands = []
     for _ in range(num_opponents):
         if len(deck) < 2:
-            return 0
+            return (0, 0, 0)
         opp_card_tuples = random.sample(list(deck), 2)
         for card_tuple in opp_card_tuples:
             deck.discard(card_tuple)
@@ -58,12 +67,15 @@ def simulate_hand_base(hole_cards: list[Card], board: list[Card], num_opponents:
 
     max_opponent = max(opponent_values) if opponent_values else 0
 
+    our_hand_type = get_hand_type(our_hand_value)
+    max_opponent_hand_type = get_hand_type(max_opponent)
+
     if our_hand_value > max_opponent:
-        return 1
+        return (1, our_hand_type, max_opponent_hand_type)
     elif our_hand_value == max_opponent:
-        return 0
+        return (0, our_hand_type, max_opponent_hand_type)
     else:
-        return -1
+        return (-1, our_hand_type, max_opponent_hand_type)
 
 
 def _create_deck() -> set:
@@ -142,3 +154,41 @@ def _is_straight(ranks: list[int]) -> bool:
                 return True
 
     return False
+
+
+def get_hand_type(hand_value: int) -> int:
+    """
+    Classify a hand value into one of 10 hand types.
+
+    Returns:
+        0: High Card
+        1: One Pair
+        2: Two Pair
+        3: Three of a Kind
+        4: Straight
+        5: Flush
+        6: Full House
+        7: Four of a Kind
+        8: Straight Flush
+        9: Royal Flush
+    """
+    if hand_value >= 9000000:
+        return 9  # Royal Flush
+    elif hand_value >= 8000000:
+        return 8  # Straight Flush
+    elif hand_value >= 7000000:
+        return 7  # Four of a Kind
+    elif hand_value >= 6000000:
+        return 6  # Full House
+    elif hand_value >= 5000000:
+        return 5  # Flush
+    elif hand_value >= 4000000:
+        return 4  # Straight
+    elif hand_value >= 3000000:
+        return 3  # Three of a Kind
+    elif hand_value >= 2000000:
+        return 2  # Two Pair
+    elif hand_value >= 1000000:
+        return 1  # One Pair
+    else:
+        return 0  # High Card

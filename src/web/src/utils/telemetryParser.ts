@@ -72,9 +72,10 @@ export function parseTelemetryPacket(
       return `${ranks[0]}${ranks[1]}${suited ? "s" : "o"}`;
     };
 
-    // Extract equity results and sample counts
+    // Extract equity results, sample counts, and win-method matrices
     const currentResults: Record<string, number> = {};
     const sampleCounts: Record<string, number> = {};
+    const winMethodMatrices: Record<string, number[][]> = {};
     const equityResultsLength = packet.equityResultsLength();
 
     for (let i = 0; i < equityResultsLength; i++) {
@@ -86,6 +87,21 @@ export function parseTelemetryPacket(
           const normalizedHandName = normalizeHandName(originalHandName);
           currentResults[normalizedHandName] = handEquity.equity();
           sampleCounts[normalizedHandName] = handEquity.simulations();
+
+          // Parse win-method matrix (flattened 100-element array)
+          if (typeof handEquity.winMethodMatrixArray === 'function') {
+            const matrixFlat = handEquity.winMethodMatrixArray();
+            if (matrixFlat && matrixFlat.length === 100) {
+              const matrix: number[][] = [];
+              for (let our_type = 0; our_type < 10; our_type++) {
+                matrix[our_type] = [];
+                for (let opp_type = 0; opp_type < 10; opp_type++) {
+                  matrix[our_type][opp_type] = matrixFlat[our_type * 10 + opp_type];
+                }
+              }
+              winMethodMatrices[normalizedHandName] = matrix;
+            }
+          }
         }
       }
     }
@@ -124,11 +140,20 @@ export function parseTelemetryPacket(
       progress: jobStatus === "completed" ? 1.0 : 0.0,
       current_results: currentResults,
       sample_counts: sampleCounts,
+      win_method_matrices: winMethodMatrices,
       metrics,
       timestamp: new Date(
         Number(data.timestamp_ns / BigInt(1e6))
       ).toISOString(),
     };
+
+    console.log("[Telemetry] Parsed update:", {
+      equityResultsCount: equityResultsLength,
+      currentResultsKeys: Object.keys(currentResults),
+      sampleCountsKeys: Object.keys(sampleCounts),
+      winMethodMatricesKeys: Object.keys(winMethodMatrices),
+      metricsSimsPerSec: metrics.simulations_per_second,
+    });
 
     return telemetryUpdate;
   } catch (error) {

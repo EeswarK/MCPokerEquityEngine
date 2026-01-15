@@ -54,6 +54,11 @@ class EquityResult:
     ties: int = 0
     losses: int = 0
     total_simulations: int = 0
+    win_method_matrix: Optional[List[List[int]]] = None
+
+    def __post_init__(self):
+        if self.win_method_matrix is None:
+            self.win_method_matrix = [[0] * 10 for _ in range(10)]
 
     def to_dict(self) -> Dict:
         return {

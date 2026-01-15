@@ -16,10 +16,11 @@ struct HandEquityResult {
     uint32_t ties;        // Number of ties
     uint32_t losses;      // Number of losses
     uint32_t simulations; // Total simulations for this hand
-    uint32_t _padding;    // Align to 32 bytes
+    uint32_t win_method_matrix[10][10];  // Win frequency by hand type: [our_type][opp_type]
+    uint32_t _padding[6]; // Padding to make total 448 bytes (8 + 4 + 4 + 4 + 4 + 400 + 24 = 448)
 };
 
-static_assert(sizeof(HandEquityResult) == 32, "HandEquityResult must be 32 bytes");
+static_assert(sizeof(HandEquityResult) == 448, "HandEquityResult must be 448 bytes");
 
 // Equity results segment (follows telemetry struct in shared memory)
 struct EquityResultsSegment {

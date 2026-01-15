@@ -5,6 +5,7 @@ import { Metrics } from "./components/Metrics";
 import { JobStatusDisplay } from "./components/JobStatus";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { CardPicker } from "./components/CardPicker";
+import { WinMethodChart } from "./components/WinMethodChart";
 import { useJob } from "./hooks/useJob";
 import { EngineMode, Card as CardType } from "./types";
 import { Button } from "./components/ui/button";
@@ -72,6 +73,14 @@ function App() {
   // Accumulate history when telemetry updates
   useEffect(() => {
     if (telemetry && telemetry.metrics.simulations_per_second > 0) {
+      console.log("[App] Telemetry received:", {
+        status: telemetry.status,
+        simsPerSec: telemetry.metrics.simulations_per_second,
+        hasCurrentResults: Object.keys(telemetry.current_results).length > 0,
+        hasSampleCounts: Object.keys(telemetry.sample_counts).length > 0,
+        hasWinMethodMatrices: Object.keys(telemetry.win_method_matrices || {}).length > 0,
+      });
+
       // Filter out first few data points if they're unreasonably high (warm-up artifacts)
       // Typical values should be in the 1k-100k range for most hardware
       const isReasonableValue = telemetry.metrics.simulations_per_second < 500000;
@@ -194,6 +203,16 @@ function App() {
                 />
               </CardContent>
             </Card>
+
+            {telemetry.win_method_matrices && Object.keys(telemetry.win_method_matrices).length > 0 ? (
+              <WinMethodChart
+                winMethodMatrix={Object.values(telemetry.win_method_matrices)[0]}
+              />
+            ) : (
+              <div className="text-sm text-muted-foreground">
+                No win method data yet (matrices: {JSON.stringify(Object.keys(telemetry.win_method_matrices || {}))})
+              </div>
+            )}
 
             <Metrics metrics={telemetry.metrics} history={metricsHistory} />
           </>

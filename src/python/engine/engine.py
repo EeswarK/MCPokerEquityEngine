@@ -100,12 +100,14 @@ class EquityEngine:
         wins = 0
         ties = 0
         losses = 0
+        win_method_matrix = [[0] * 10 for _ in range(10)]
         update_interval = 1000  # Update shared memory every 1000 simulations
 
         for sim_num in range(num_simulations):
-            outcome = self.simulate_hand(hole_cards, board, num_opponents)
+            outcome, our_type, opp_type = self.simulate_hand(hole_cards, board, num_opponents)
             if outcome == 1:
                 wins += 1
+                win_method_matrix[our_type][opp_type] += 1
             elif outcome == 0:
                 ties += 1
             else:
@@ -130,6 +132,7 @@ class EquityEngine:
                     ties=ties,
                     losses=losses,
                     total_simulations=sim_num + 1,
+                    win_method_matrix=win_method_matrix,
                 )
                 results[hand_name] = partial_result
                 self.shm_writer.update_equity_results(results)
@@ -144,6 +147,7 @@ class EquityEngine:
             ties=ties,
             losses=losses,
             total_simulations=num_simulations,
+            win_method_matrix=win_method_matrix,
         )
 
     def get_mode(self) -> str:

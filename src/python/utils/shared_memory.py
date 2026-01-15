@@ -11,12 +11,13 @@ MAX_HANDS = 169
 
 class HandEquityResult(Structure):
     _fields_ = [
-        ("equity", c_double),      # 8 bytes
-        ("wins", c_uint32),        # 4 bytes
-        ("ties", c_uint32),        # 4 bytes
-        ("losses", c_uint32),      # 4 bytes
-        ("simulations", c_uint32), # 4 bytes
-        ("_padding", c_uint32),    # 4 bytes (align to 32 bytes)
+        ("equity", c_double),                    # 8 bytes
+        ("wins", c_uint32),                      # 4 bytes
+        ("ties", c_uint32),                      # 4 bytes
+        ("losses", c_uint32),                    # 4 bytes
+        ("simulations", c_uint32),               # 4 bytes
+        ("win_method_matrix", (c_uint32 * 10) * 10),  # 400 bytes (10x10 matrix)
+        ("_padding", c_uint32 * 6),              # 24 bytes (total 448 bytes)
     ]
 
 
@@ -137,6 +138,13 @@ class SharedMemoryWriter:
             self.data.equity_results.results[idx].ties = result.ties
             self.data.equity_results.results[idx].losses = result.losses
             self.data.equity_results.results[idx].simulations = result.total_simulations
+
+            # Write win-method matrix
+            if result.win_method_matrix is not None:
+                for our_type in range(10):
+                    for opp_type in range(10):
+                        self.data.equity_results.results[idx].win_method_matrix[our_type][opp_type] = \
+                            result.win_method_matrix[our_type][opp_type]
 
         self.data.equity_results.seq += 1
 

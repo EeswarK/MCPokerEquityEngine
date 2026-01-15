@@ -29,7 +29,8 @@ struct HandEquity FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
     VT_WINS = 8,
     VT_TIES = 10,
     VT_LOSSES = 12,
-    VT_SIMULATIONS = 14
+    VT_SIMULATIONS = 14,
+    VT_WIN_METHOD_MATRIX = 16
   };
   const ::flatbuffers::String *hand_name() const {
     return GetPointer<const ::flatbuffers::String *>(VT_HAND_NAME);
@@ -49,6 +50,9 @@ struct HandEquity FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   uint32_t simulations() const {
     return GetField<uint32_t>(VT_SIMULATIONS, 0);
   }
+  const ::flatbuffers::Vector<uint32_t> *win_method_matrix() const {
+    return GetPointer<const ::flatbuffers::Vector<uint32_t> *>(VT_WIN_METHOD_MATRIX);
+  }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyOffset(verifier, VT_HAND_NAME) &&
@@ -58,6 +62,8 @@ struct HandEquity FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
            VerifyField<uint32_t>(verifier, VT_TIES, 4) &&
            VerifyField<uint32_t>(verifier, VT_LOSSES, 4) &&
            VerifyField<uint32_t>(verifier, VT_SIMULATIONS, 4) &&
+           VerifyOffset(verifier, VT_WIN_METHOD_MATRIX) &&
+           verifier.VerifyVector(win_method_matrix()) &&
            verifier.EndTable();
   }
 };
@@ -84,6 +90,9 @@ struct HandEquityBuilder {
   void add_simulations(uint32_t simulations) {
     fbb_.AddElement<uint32_t>(HandEquity::VT_SIMULATIONS, simulations, 0);
   }
+  void add_win_method_matrix(::flatbuffers::Offset<::flatbuffers::Vector<uint32_t>> win_method_matrix) {
+    fbb_.AddOffset(HandEquity::VT_WIN_METHOD_MATRIX, win_method_matrix);
+  }
   explicit HandEquityBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
@@ -102,9 +111,11 @@ inline ::flatbuffers::Offset<HandEquity> CreateHandEquity(
     uint32_t wins = 0,
     uint32_t ties = 0,
     uint32_t losses = 0,
-    uint32_t simulations = 0) {
+    uint32_t simulations = 0,
+    ::flatbuffers::Offset<::flatbuffers::Vector<uint32_t>> win_method_matrix = 0) {
   HandEquityBuilder builder_(_fbb);
   builder_.add_equity(equity);
+  builder_.add_win_method_matrix(win_method_matrix);
   builder_.add_simulations(simulations);
   builder_.add_losses(losses);
   builder_.add_ties(ties);
@@ -120,8 +131,10 @@ inline ::flatbuffers::Offset<HandEquity> CreateHandEquityDirect(
     uint32_t wins = 0,
     uint32_t ties = 0,
     uint32_t losses = 0,
-    uint32_t simulations = 0) {
+    uint32_t simulations = 0,
+    const std::vector<uint32_t> *win_method_matrix = nullptr) {
   auto hand_name__ = hand_name ? _fbb.CreateString(hand_name) : 0;
+  auto win_method_matrix__ = win_method_matrix ? _fbb.CreateVector<uint32_t>(*win_method_matrix) : 0;
   return Telemetry::CreateHandEquity(
       _fbb,
       hand_name__,
@@ -129,7 +142,8 @@ inline ::flatbuffers::Offset<HandEquity> CreateHandEquityDirect(
       wins,
       ties,
       losses,
-      simulations);
+      simulations,
+      win_method_matrix__);
 }
 
 struct TelemetryPacket FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
