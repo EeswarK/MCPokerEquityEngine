@@ -27,6 +27,35 @@ function App() {
     telemetryConnected,
   } = useJob();
 
+  // Classify user's cards into standard notation (AA, AKs, AKo, etc.)
+  const classifyHoleCards = (c1: CardType, c2: CardType): string => {
+    const rankToChar = (rank: number) => {
+      if (rank <= 10) return rank.toString();
+      const map: Record<number, string> = {
+        11: "J",
+        12: "Q",
+        13: "K",
+        14: "A",
+      };
+      return map[rank] || rank.toString();
+    };
+
+    // Pocket pair
+    if (c1.rank === c2.rank) {
+      return `${rankToChar(c1.rank)}${rankToChar(c1.rank)}`;
+    }
+
+    // Sort by rank (higher first)
+    const highCard = c1.rank > c2.rank ? c1 : c2;
+    const lowCard = c1.rank > c2.rank ? c2 : c1;
+
+    // Suited or offsuit
+    const suited = c1.suit === c2.suit;
+    const suffix = suited ? "s" : "o";
+
+    return `${rankToChar(highCard.rank)}${rankToChar(lowCard.rank)}${suffix}`;
+  };
+
   const handleSubmit = async () => {
     if (!card1 || !card2) {
       alert("Please select both hole cards");
@@ -199,6 +228,7 @@ function App() {
                 <Heatmap
                   data={telemetry.current_results}
                   sampleCounts={telemetry.sample_counts}
+                  heroHand={card1 && card2 ? classifyHoleCards(card1, card2) : undefined}
                   isLoading={telemetry.status === "running"}
                 />
               </CardContent>

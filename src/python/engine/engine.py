@@ -59,7 +59,9 @@ class EquityEngine:
                     hand_name,
                     results,
                 )
-                results[hand_name] = equity_result
+                # Store overall equity result (for API response) but don't add to results dict
+                # because results dict now contains opponent-specific equity data
+                # results[hand_name] = equity_result  # REMOVED - would overwrite opponent data
                 # Note: simulations_processed is now updated inside _calculate_hand_equity
 
                 # Final update for this hand with complete results
@@ -97,56 +99,94 @@ class EquityEngine:
         hand_name: str = "",
         results: Optional[Dict[str, EquityResult]] = None,
     ) -> EquityResult:
-        wins = 0
-        ties = 0
-        losses = 0
+        # Track equity by opponent hand type
+        opponent_stats: Dict[str, Dict[str, int]] = {}  # opponent_hand -> {wins, ties, losses, total}
         win_method_matrix = [[0] * 10 for _ in range(10)]
         update_interval = 1000  # Update shared memory every 1000 simulations
 
         for sim_num in range(num_simulations):
-            outcome, our_type, opp_type = self.simulate_hand(hole_cards, board, num_opponents)
+            outcome, our_type, opp_type, opp_hand_classification = self.simulate_hand(hole_cards, board, num_opponents)
+
+            # Initialize stats for this opponent hand type if not seen before
+            if opp_hand_classification not in opponent_stats:
+                opponent_stats[opp_hand_classification] = {"wins": 0, "ties": 0, "losses": 0, "total": 0}
+
+            stats = opponent_stats[opp_hand_classification]
+            stats["total"] += 1
+
             if outcome == 1:
-                wins += 1
+                stats["wins"] += 1
                 win_method_matrix[our_type][opp_type] += 1
             elif outcome == 0:
-                ties += 1
+                stats["ties"] += 1
             else:
-                losses += 1
+                stats["losses"] += 1
 
             # Periodically update shared memory with partial results
-            if self.shm_writer and results is not None and hand_name and (sim_num + 1) % update_interval == 0:
-                total = wins + ties + losses
-                equity = (wins + ties * 0.5) / total if total > 0 else 0.0
-
+            if self.shm_writer and results is not None and (sim_num + 1) % update_interval == 0:
                 # Update hands processed counter
                 self.simulations_processed += update_interval
                 if (self.simulations_processed - self.last_update_count) >= self.update_frequency:
                     self.shm_writer.update_hands(self.simulations_processed)
                     self.last_update_count = self.simulations_processed
 
-                # Update partial equity results
-                partial_result = EquityResult(
-                    hand_name=hand_name,
-                    equity=equity,
-                    wins=wins,
-                    ties=ties,
-                    losses=losses,
-                    total_simulations=sim_num + 1,
-                    win_method_matrix=win_method_matrix,
-                )
-                results[hand_name] = partial_result
+                # Create EquityResult for each opponent hand type
+                for opp_hand, stats_dict in opponent_stats.items():
+                    total = stats_dict["total"]
+                    equity = (stats_dict["wins"] + stats_dict["ties"] * 0.5) / total if total > 0 else 0.0
+
+                    results[opp_hand] = EquityResult(
+                        hand_name=opp_hand,
+                        equity=equity,
+                        wins=stats_dict["wins"],
+                        ties=stats_dict["ties"],
+                        losses=stats_dict["losses"],
+                        total_simulations=total,
+                        win_method_matrix=win_method_matrix,
+                    )
+
                 self.shm_writer.update_equity_results(results)
 
-        total = wins + ties + losses
-        equity = (wins + ties * 0.5) / total if total > 0 else 0.0
+        # Create final EquityResults for each opponent hand type
+        final_results = {}
+        for opp_hand, stats_dict in opponent_stats.items():
+            total = stats_dict["total"]
+            equity = (stats_dict["wins"] + stats_dict["ties"] * 0.5) / total if total > 0 else 0.0
+
+            final_results[opp_hand] = EquityResult(
+                hand_name=opp_hand,
+                equity=equity,
+                wins=stats_dict["wins"],
+                ties=stats_dict["ties"],
+                losses=stats_dict["losses"],
+                total_simulations=total,
+                win_method_matrix=win_method_matrix,
+            )
+
+        # Debug logging
+        import logging
+        logging.info(f"[ENGINE] Opponent stats collected: {len(opponent_stats)} unique hands")
+        logging.info(f"[ENGINE] Sample opponent hands: {list(opponent_stats.keys())[:20]}")
+
+        # Update results dict with all opponent-specific equities
+        if results is not None:
+            results.update(final_results)
+            logging.info(f"[ENGINE] Results dict now has {len(results)} entries")
+
+        # Return overall equity as a summary (for backward compatibility)
+        total_sims = sum(stats["total"] for stats in opponent_stats.values())
+        total_wins = sum(stats["wins"] for stats in opponent_stats.values())
+        total_ties = sum(stats["ties"] for stats in opponent_stats.values())
+        total_losses = sum(stats["losses"] for stats in opponent_stats.values())
+        overall_equity = (total_wins + total_ties * 0.5) / total_sims if total_sims > 0 else 0.0
 
         return EquityResult(
             hand_name=hand_name,
-            equity=equity,
-            wins=wins,
-            ties=ties,
-            losses=losses,
-            total_simulations=num_simulations,
+            equity=overall_equity,
+            wins=total_wins,
+            ties=total_ties,
+            losses=total_losses,
+            total_simulations=total_sims,
             win_method_matrix=win_method_matrix,
         )
 

@@ -91,7 +91,7 @@ def test_engine_function_injection():
         return 1000000
 
     def mock_simulate(hole_cards, board, num_opponents):
-        return 1
+        return (1, 1, 0, "AKo")  # outcome, our_type, opp_type, opp_hand
 
     engine = EquityEngine(
         evaluate_hand=mock_evaluate,

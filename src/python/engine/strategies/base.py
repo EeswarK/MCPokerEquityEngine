@@ -27,15 +27,16 @@ def evaluate_hand_base(hole_cards: list[Card], board_cards: list[Card]) -> int:
     return best_value
 
 
-def simulate_hand_base(hole_cards: list[Card], board: list[Card], num_opponents: int) -> tuple[int, int, int]:
+def simulate_hand_base(hole_cards: list[Card], board: list[Card], num_opponents: int) -> tuple[int, int, int, str]:
     """
     Simulate a poker hand and return outcome with hand type information.
 
     Returns:
-        tuple[int, int, int]: (outcome, our_hand_type, max_opponent_hand_type)
+        tuple[int, int, int, str]: (outcome, our_hand_type, max_opponent_hand_type, opponent_hole_cards)
         - outcome: 1=win, 0=tie, -1=loss
-        - our_hand_type: 0-9 (High Card to Royal Flush)
-        - max_opponent_hand_type: 0-9 (High Card to Royal Flush)
+        - our_hand_type: 0-9 (High Card to Royal Flush) at showdown
+        - max_opponent_hand_type: 0-9 (High Card to Royal Flush) at showdown
+        - opponent_hole_cards: Starting hand classification of best opponent (e.g., "AA", "AKs", "72o")
     """
     deck = _create_deck()
     known_cards = set((c.rank, c.suit) for c in hole_cards + board)
@@ -48,7 +49,7 @@ def simulate_hand_base(hole_cards: list[Card], board: list[Card], num_opponents:
 
     for _ in range(remaining_board):
         if not deck:
-            return (0, 0, 0)
+            return (0, 0, 0, "??")
         card_tuple = random.choice(list(deck))
         deck.discard(card_tuple)
         board_cards.append(Card(rank=card_tuple[0], suit=card_tuple[1]))
@@ -56,7 +57,7 @@ def simulate_hand_base(hole_cards: list[Card], board: list[Card], num_opponents:
     opponent_hands = []
     for _ in range(num_opponents):
         if len(deck) < 2:
-            return (0, 0, 0)
+            return (0, 0, 0, "??")
         opp_card_tuples = random.sample(list(deck), 2)
         for card_tuple in opp_card_tuples:
             deck.discard(card_tuple)
@@ -66,16 +67,20 @@ def simulate_hand_base(hole_cards: list[Card], board: list[Card], num_opponents:
     opponent_values = [evaluate_hand_base(hand, board_cards) for hand in opponent_hands]
 
     max_opponent = max(opponent_values) if opponent_values else 0
+    max_opponent_idx = opponent_values.index(max_opponent) if opponent_values else 0
 
     our_hand_type = get_hand_type(our_hand_value)
     max_opponent_hand_type = get_hand_type(max_opponent)
 
+    # Classify the best opponent's starting hand
+    opponent_hole_classification = classify_hole_cards(opponent_hands[max_opponent_idx]) if opponent_hands else "??"
+
     if our_hand_value > max_opponent:
-        return (1, our_hand_type, max_opponent_hand_type)
+        return (1, our_hand_type, max_opponent_hand_type, opponent_hole_classification)
     elif our_hand_value == max_opponent:
-        return (0, our_hand_type, max_opponent_hand_type)
+        return (0, our_hand_type, max_opponent_hand_type, opponent_hole_classification)
     else:
-        return (-1, our_hand_type, max_opponent_hand_type)
+        return (-1, our_hand_type, max_opponent_hand_type, opponent_hole_classification)
 
 
 def _create_deck() -> set:
@@ -192,3 +197,49 @@ def get_hand_type(hand_value: int) -> int:
         return 1  # One Pair
     else:
         return 0  # High Card
+
+
+def classify_hole_cards(hole_cards: list[Card]) -> str:
+    """
+    Classify hole cards into standard poker hand notation.
+
+    Examples:
+        [A♠, A♥] -> "AA"
+        [A♠, K♠] -> "AKs"
+        [A♠, K♥] -> "AKo"
+        [7♠, 2♥] -> "72o"
+
+    Returns:
+        str: Hand classification (e.g., "AA", "AKs", "72o")
+    """
+    if len(hole_cards) != 2:
+        return "??"
+
+    card1, card2 = hole_cards
+    rank1, suit1 = card1.rank, card1.suit
+    rank2, suit2 = card2.rank, card2.suit
+
+    # Convert rank to character
+    def rank_to_char(rank: int) -> str:
+        if rank < 10:
+            return str(rank)
+        rank_map = {10: "T", 11: "J", 12: "Q", 13: "K", 14: "A"}
+        return rank_map.get(rank, "?")
+
+    # Pocket pair
+    if rank1 == rank2:
+        return f"{rank_to_char(rank1)}{rank_to_char(rank2)}"
+
+    # Sort by rank (higher first)
+    if rank1 > rank2:
+        high_rank, high_suit = rank1, suit1
+        low_rank, low_suit = rank2, suit2
+    else:
+        high_rank, high_suit = rank2, suit2
+        low_rank, low_suit = rank1, suit1
+
+    # Suited or offsuit
+    suited = (suit1 == suit2)
+    suffix = "s" if suited else "o"
+
+    return f"{rank_to_char(high_rank)}{rank_to_char(low_rank)}{suffix}"
