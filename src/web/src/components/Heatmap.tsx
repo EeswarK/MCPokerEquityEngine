@@ -136,18 +136,30 @@ export const Heatmap: React.FC<HeatmapProps> = ({
       </Table>
 
       {/* Color Scale Legend */}
-      <div className="mt-4">
-        <div className="text-sm font-medium mb-2">Equity Scale</div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs">0%</span>
-          <div className="flex-1 h-6 rounded" style={{
-            background: 'linear-gradient(to right, rgb(33, 102, 172), rgb(128, 128, 128), rgb(34, 139, 34))'
-          }}>
+      <div className="mt-4 space-y-3">
+        <div>
+          <div className="text-sm font-medium mb-2">Equity Scale</div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs">0%</span>
+            <div className="flex-1 h-6 rounded" style={{
+              background: 'linear-gradient(to right, rgb(33, 102, 172), rgb(128, 128, 128), rgb(34, 139, 34))'
+            }}>
+            </div>
+            <span className="text-xs">100%</span>
           </div>
-          <span className="text-xs">100%</span>
+          <div className="text-xs text-muted-foreground mt-1">
+            Opacity indicates confidence (darker = more simulations)
+          </div>
         </div>
-        <div className="text-xs text-muted-foreground mt-1">
-          Opacity indicates confidence (darker = more simulations)
+
+        {/* Suited/Offsuit Legend */}
+        <div className="text-xs text-muted-foreground">
+          <div className="font-medium mb-1">Hand Types:</div>
+          <div className="space-y-0.5">
+            <div>• <span className="font-medium">Above diagonal</span> (upper-right): Suited hands (e.g., AKs)</div>
+            <div>• <span className="font-medium">On diagonal</span>: Pocket pairs (e.g., AA, KK)</div>
+            <div>• <span className="font-medium">Below diagonal</span> (lower-left): Offsuit hands (e.g., AKo)</div>
+          </div>
         </div>
       </div>
     </div>
