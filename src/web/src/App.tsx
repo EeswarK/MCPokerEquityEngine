@@ -6,6 +6,7 @@ import { JobStatusDisplay } from "./components/JobStatus";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { CardPicker } from "./components/CardPicker";
 import { WinMethodChart } from "./components/WinMethodChart";
+import { SimulationCountSelector } from "./components/SimulationCountSelector";
 import { useJob } from "./hooks/useJob";
 import { EngineMode, Card as CardType } from "./types";
 import { Button } from "./components/ui/button";
@@ -14,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 function App() {
   const [mode, setMode] = useState<EngineMode>("base_python");
   const [numWorkers, setNumWorkers] = useState(4);
+  const [numSimulations, setNumSimulations] = useState(100000);
   const [card1, setCard1] = useState<CardType | null>(null);
   const [card2, setCard2] = useState<CardType | null>(null);
   const {
@@ -85,7 +87,7 @@ function App() {
     await submitJob({
       range_spec: rangeSpec,
       num_opponents: 1,
-      num_simulations: 100000,
+      num_simulations: numSimulations,
       mode,
       num_workers:
         mode === "multiprocessing" || mode === "cpp_threaded"
@@ -171,6 +173,12 @@ function App() {
               onChange={setMode}
               numWorkers={numWorkers}
               onWorkersChange={setNumWorkers}
+              disabled={loading || !!jobId}
+            />
+
+            <SimulationCountSelector
+              value={numSimulations}
+              onChange={setNumSimulations}
               disabled={loading || !!jobId}
             />
 
