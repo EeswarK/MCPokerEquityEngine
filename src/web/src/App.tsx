@@ -138,6 +138,15 @@ function App() {
     }
   }, [jobId]);
 
+  const completedSimulations = telemetry?.sample_counts
+    ? Object.values(telemetry.sample_counts).reduce((sum, count) => sum + count, 0)
+    : 0;
+  const progress = telemetry?.status === "completed"
+    ? 1.0
+    : numSimulations > 0
+      ? Math.min(completedSimulations / numSimulations, 1.0)
+      : 0;
+
   return (
     <div className="mx-auto max-w-[1400px] p-8">
       <ThemeToggle />
@@ -202,7 +211,7 @@ function App() {
             {jobId && (
               <JobStatusDisplay
                 status={telemetry?.status || "pending"}
-                progress={telemetry?.progress || 0}
+                progress={progress}
                 error={
                   error || telemetry?.status === "failed"
                     ? "Job failed"
