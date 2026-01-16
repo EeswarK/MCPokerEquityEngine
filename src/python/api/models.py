@@ -38,6 +38,7 @@ class CreateJobResponse(BaseModel):
     job_id: str
     status: str
     created_at: str
+    telemetry_ws_url: Optional[str] = None
 
 
 class JobStatusResponse(BaseModel):

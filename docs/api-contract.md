@@ -27,9 +27,12 @@ Create a new equity calculation job.
 {
   job_id: string,
   status: "pending" | "running" | "completed" | "failed",
-  created_at: string  // ISO 8601
+  created_at: string,  // ISO 8601
+  telemetry_ws_url?: string  // WebSocket URL for direct telemetry connection (e.g., "ws://localhost:8001/telemetry/{job_id}")
 }
 ```
+
+The `telemetry_ws_url` field contains the WebSocket URL for connecting directly to the C++ telemetry collector. This is separate from the job management WebSocket connection at `ws://host:port/ws/{job_id}`.
 
 ### GET /api/jobs/{job_id}/status
 

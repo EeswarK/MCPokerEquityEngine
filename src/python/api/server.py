@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import os
 import uuid
 
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect, status
@@ -67,12 +68,22 @@ async def create_job(request: CreateJobRequest):
 
     internal_request = create_job_request_to_internal(request)
 
+    host = os.getenv("TELEMETRY_HOST", "localhost")
+    protocol = os.getenv("TELEMETRY_WS_PROTOCOL", "ws")
+
+    if protocol == "wss":
+        telemetry_ws_url = f"{protocol}://{host}/telemetry/{job_id}"
+    else:
+        telemetry_port = int(os.getenv("TELEMETRY_PORT", "8001"))
+        telemetry_ws_url = f"{protocol}://{host}:{telemetry_port}/telemetry/{job_id}"
+
     asyncio.create_task(execute_job_async(job_id, internal_request, job_state, connection_manager))
 
     return CreateJobResponse(
         job_id=job_id,
         status=job_state.status.value,
         created_at=job_state.created_at.isoformat(),
+        telemetry_ws_url=telemetry_ws_url,
     )
 
 
@@ -112,18 +123,27 @@ async def websocket_endpoint(websocket: WebSocket, job_id: str):
 
     try:
         while True:
-            data = await websocket.receive_text()
             try:
-                message = json.loads(data)
-                if message.get("type") == "ping":
-                    from datetime import datetime
+                message = await websocket.receive()
+                if "text" in message:
+                    data = message["text"]
+                    try:
+                        parsed = json.loads(data)
+                        if parsed.get("type") == "ping":
+                            from datetime import datetime
 
-                    await websocket.send_text(
-                        json.dumps(
-                            {"type": "pong", "data": {"timestamp": datetime.utcnow().isoformat()}}
-                        )
-                    )
-            except json.JSONDecodeError:
-                pass
+                            await websocket.send_text(
+                                json.dumps(
+                                    {
+                                        "type": "pong",
+                                        "data": {"timestamp": datetime.utcnow().isoformat()},
+                                    }
+                                )
+                            )
+                    except json.JSONDecodeError:
+                        pass
+            except Exception as e:
+                logger.error(f"WebSocket receive error: {e}")
+                break
     except WebSocketDisconnect:
         connection_manager.disconnect(websocket, job_id)

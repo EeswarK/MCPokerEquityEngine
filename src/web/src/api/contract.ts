@@ -13,6 +13,7 @@ export interface CreateJobResponse {
   job_id: string;
   status: JobStatus;
   created_at: string; // ISO 8601 timestamp
+  telemetry_ws_url?: string;
 }
 
 export interface JobStatusResponse {
@@ -40,6 +41,7 @@ export interface PerformanceMetrics {
   cpu_percent?: number;
   memory_mb?: number;
   num_workers?: number;
+  cpu_cycles?: number; // From perf_event_open hardware counter
   cache_misses?: number; // Future: from perf counters
   branch_misses?: number; // Future: from perf counters
 }

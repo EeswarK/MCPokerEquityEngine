@@ -128,6 +128,7 @@ echo "Configuring firewall..."
 ufw --force enable
 ufw allow 22/tcp
 ufw allow 8000/tcp
+ufw allow 8001/tcp
 ufw status
 
 # Start service

@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 function App() {
   const [mode, setMode] = useState<EngineMode>("base_python");
   const [numWorkers, setNumWorkers] = useState(4);
-  const { jobId, submitJob, resetJob, loading, error, telemetry, connected } =
+  const { jobId, submitJob, resetJob, loading, error, telemetry, connected, telemetryConnected } =
     useJob();
 
   const handleSubmit = async () => {
@@ -105,7 +105,17 @@ function App() {
 
             {connected && (
               <div className="text-sm text-green-600 dark:text-green-400">
-                Connected
+                Connected (Job Management)
+              </div>
+            )}
+            {telemetryConnected && (
+              <div className="text-sm text-green-600 dark:text-green-400">
+                Connected (Telemetry)
+              </div>
+            )}
+            {!telemetryConnected && jobId && (
+              <div className="text-sm text-yellow-600 dark:text-yellow-400">
+                Telemetry connection pending...
               </div>
             )}
           </CardContent>
