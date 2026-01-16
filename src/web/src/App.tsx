@@ -6,6 +6,7 @@ import { JobStatusDisplay } from "./components/JobStatus";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { CardPicker } from "./components/CardPicker";
 import { WinMethodChart } from "./components/WinMethodChart";
+import { EquityCategoryChart } from "./components/EquityCategoryChart";
 import { SimulationCountSelector } from "./components/SimulationCountSelector";
 import { useJob } from "./hooks/useJob";
 import { EngineMode, Card as CardType } from "./types";
@@ -109,12 +110,14 @@ function App() {
         simsPerSec: telemetry.metrics.simulations_per_second,
         hasCurrentResults: Object.keys(telemetry.current_results).length > 0,
         hasSampleCounts: Object.keys(telemetry.sample_counts).length > 0,
-        hasWinMethodMatrices: Object.keys(telemetry.win_method_matrices || {}).length > 0,
+        hasWinMethodMatrices:
+          Object.keys(telemetry.win_method_matrices || {}).length > 0,
       });
 
       // Filter out first few data points if they're unreasonably high (warm-up artifacts)
       // Typical values should be in the 1k-100k range for most hardware
-      const isReasonableValue = telemetry.metrics.simulations_per_second < 500000;
+      const isReasonableValue =
+        telemetry.metrics.simulations_per_second < 500000;
 
       if (isReasonableValue) {
         setMetricsHistory((prev) => [
@@ -126,7 +129,7 @@ function App() {
         ]);
       }
     }
-  }, [telemetry?.timestamp]); // Trigger on new telemetry
+  }, [telemetry, telemetry?.timestamp]); // Trigger on new telemetry
 
   // Reset history when job resets
   useEffect(() => {
@@ -236,19 +239,36 @@ function App() {
                 <Heatmap
                   data={telemetry.current_results}
                   sampleCounts={telemetry.sample_counts}
-                  heroHand={card1 && card2 ? classifyHoleCards(card1, card2) : undefined}
+                  heroHand={
+                    card1 && card2 ? classifyHoleCards(card1, card2) : undefined
+                  }
                   isLoading={telemetry.status === "running"}
                 />
               </CardContent>
             </Card>
 
-            {telemetry.win_method_matrices && Object.keys(telemetry.win_method_matrices).length > 0 ? (
+            {telemetry.win_method_matrices &&
+              Object.keys(telemetry.win_method_matrices).length > 0 && (
+                <EquityCategoryChart
+                  equityData={telemetry.current_results}
+                  winMethodMatrices={telemetry.win_method_matrices}
+                />
+              )}
+
+            {telemetry.win_method_matrices &&
+            Object.keys(telemetry.win_method_matrices).length > 0 ? (
               <WinMethodChart
-                winMethodMatrix={Object.values(telemetry.win_method_matrices)[0]}
+                winMethodMatrix={
+                  Object.values(telemetry.win_method_matrices)[0]
+                }
               />
             ) : (
-              <div className="text-sm text-muted-foreground">
-                No win method data yet (matrices: {JSON.stringify(Object.keys(telemetry.win_method_matrices || {}))})
+              <div className="text-muted-foreground text-sm">
+                No win method data yet (matrices:{" "}
+                {JSON.stringify(
+                  Object.keys(telemetry.win_method_matrices || {}),
+                )}
+                )
               </div>
             )}
 
