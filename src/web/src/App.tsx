@@ -4,6 +4,7 @@ import { Heatmap } from "./components/Heatmap";
 import { Metrics } from "./components/Metrics";
 import { JobStatusDisplay } from "./components/JobStatus";
 import { ThemeToggle } from "./components/ThemeToggle";
+import { EquityCategoryChart } from "./components/EquityCategoryChart";
 import { useJob } from "./hooks/useJob";
 import { EngineMode } from "./types";
 import { Button } from "./components/ui/button";
@@ -134,6 +135,13 @@ function App() {
                 />
               </CardContent>
             </Card>
+
+            {telemetry.win_method_matrices && Object.keys(telemetry.win_method_matrices).length > 0 && (
+              <EquityCategoryChart
+                equityData={telemetry.current_results}
+                winMethodMatrices={telemetry.win_method_matrices}
+              />
+            )}
 
             <Metrics metrics={telemetry.metrics} history={metricsHistory} />
           </>
