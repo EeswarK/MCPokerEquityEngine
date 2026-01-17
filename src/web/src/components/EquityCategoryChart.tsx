@@ -5,7 +5,7 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   Legend,
   ResponsiveContainer,
   Cell,
@@ -16,6 +16,12 @@ import {
   CardHeader,
   CardTitle,
 } from "./ui/card";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "./ui/tooltip";
 
 interface EquityCategoryChartProps {
   equityData: Record<string, number>;
@@ -166,7 +172,7 @@ export const EquityCategoryChart: React.FC<EquityCategoryChartProps> = ({
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis type="number" domain={[0, 100]} />
               <YAxis dataKey="category" type="category" width={150} />
-              <Tooltip content={<CustomTooltip />} />
+              <RechartsTooltip content={<CustomTooltip />} />
               <Legend />
               <Bar dataKey="equity" fill="#8884d8" name="Equity %">
                 {chartData.map((entry, index) => (
@@ -301,22 +307,33 @@ const UnifiedMatrixHeatmap: React.FC<{
                 const isDiagonal = rowIdx === colIdx;
                 const borderStyle = isDiagonal ? "2px solid #f59e0b" : undefined; // Orange border for kicker battles
 
-                const narrative = cellTotal > 0
-                  ? `Matchup: You have ${HAND_TYPE_NAMES[rowIdx]}, Opp has ${HAND_TYPE_NAMES[colIdx]}\nFrequency: ${percentage.toFixed(1)}%\n\nOutcomes:\nWins: ${wins.toLocaleString()} (${winPct.toFixed(1)}%)\nLosses: ${losses.toLocaleString()} (${lossPct.toFixed(1)}%)`
-                  : "No outcomes";
-
                 return (
-                  <td
-                    key={colIdx}
-                    className="border p-1 text-center transition-colors hover:ring-2 hover:ring-primary z-10 relative cursor-help"
-                    style={{
-                      backgroundColor: bgColor,
-                      border: borderStyle
-                    }}
-                    title={narrative}
-                  >
-                    {percentage >= 1.0 ? `${percentage.toFixed(0)}%` : (percentage > 0 ? "<1%" : "")}
-                  </td>
+                  <TooltipProvider key={colIdx}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <td
+                          className="border p-1 text-center transition-colors hover:ring-2 hover:ring-primary z-10 relative cursor-help"
+                          style={{
+                            backgroundColor: bgColor,
+                            border: borderStyle
+                          }}
+                        >
+                          {percentage >= 1.0 ? `${percentage.toFixed(0)}%` : (percentage > 0 ? "<1%" : "")}
+                        </td>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <div className="text-sm">
+                          <p className="font-semibold mb-1">Matchup Analysis</p>
+                          <p>You: <span className="font-medium">{HAND_TYPE_NAMES[rowIdx]}</span></p>
+                          <p>Opponent: <span className="font-medium">{HAND_TYPE_NAMES[colIdx]}</span></p>
+                          <div className="my-2 border-t border-border/50" />
+                          <p>Frequency: <span className="font-medium">{percentage.toFixed(2)}%</span></p>
+                          <p>Wins: <span className="text-green-500 font-medium">{wins.toLocaleString()}</span> ({winPct.toFixed(1)}%)</p>
+                          <p>Losses: <span className="text-red-500 font-medium">{losses.toLocaleString()}</span> ({lossPct.toFixed(1)}%)</p>
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 );
               })}
             </tr>
@@ -331,9 +348,6 @@ const UnifiedMatrixHeatmap: React.FC<{
            <span className="flex items-center"><span className="w-3 h-3 bg-blue-500 mr-1 rounded-sm"></span>Contested (~50/50)</span>
            <span className="flex items-center"><span className="w-3 h-3 border-2 border-orange-500 mr-1 rounded-sm"></span>Diagonal (Kicker Battles)</span>
         </div>
-        <p className="italic opacity-80 mt-1">
-            Percentages show frequency of this specific matchup occurring relative to all decisive outcomes in this category.
-        </p>
       </div>
     </div>
   );

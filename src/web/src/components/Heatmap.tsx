@@ -6,6 +6,12 @@ import {
   TableHeader,
   TableRow,
 } from "./ui/table";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "./ui/tooltip";
 
 interface HeatmapProps {
   data: Record<string, number>; // hand_name -> equity (0.0 to 1.0)
@@ -107,33 +113,45 @@ export const Heatmap: React.FC<HeatmapProps> = ({
                 const standardError = getStandardError(equity, sampleCount);
                 const marginOfError = standardError * 1.96 * 100; // 95% confidence interval
 
-                // Enhanced tooltip
-                const tooltipText = equity > 0
-                  ? `${handName}: ${(equity * 100).toFixed(2)}% equity\n` +
-                    `Simulations: ${sampleCount.toLocaleString()}\n` +
-                    `Margin of Error: ±${marginOfError.toFixed(2)}%`
-                  : `${handName}: No data`;
-
                 return (
-                  <TableCell
-                    key={`${rank1}-${rank2}`}
-                    className="text-center relative"
-                    style={{
-                      backgroundColor: getColor(equity, sampleCount),
-                      color: equity > 0.5 ? "#fff" : "#000",
-                      border: isHeroCell ? "3px solid #ff6b00" : undefined,
-                      boxShadow: isHeroCell ? "0 0 8px rgba(255, 107, 0, 0.6)" : undefined,
-                    }}
-                    title={tooltipText}
-                  >
-                    {equity > 0 ? `${(equity * 100).toFixed(0)}%` : "-"}
-                  </TableCell>
+                  <TooltipProvider key={`${rank1}-${rank2}`}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <TableCell
+                          className="text-center relative cursor-help"
+                          style={{
+                            backgroundColor: getColor(equity, sampleCount),
+                            color: equity > 0.5 ? "#fff" : "#000",
+                            border: isHeroCell ? "3px solid #ff6b00" : undefined,
+                            boxShadow: isHeroCell ? "0 0 8px rgba(255, 107, 0, 0.6)" : undefined,
+                          }}
+                        >
+                          {equity > 0 ? `${(equity * 100).toFixed(0)}%` : "-"}
+                        </TableCell>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <div className="text-sm">
+                          <p className="font-bold mb-1">{handName}</p>
+                          {equity > 0 ? (
+                            <>
+                              <p>Equity: <span className="font-medium">{(equity * 100).toFixed(2)}%</span></p>
+                              <p>Simulations: <span className="text-muted-foreground">{sampleCount.toLocaleString()}</span></p>
+                              <p className="text-xs text-muted-foreground mt-1">Margin of Error: ±{marginOfError.toFixed(2)}%</p>
+                            </>
+                          ) : (
+                            <p className="text-muted-foreground">No data</p>
+                          )}
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 );
               })}
             </TableRow>
           ))}
         </TableBody>
       </Table>
+
 
       {/* Color Scale Legend */}
       <div className="mt-4 space-y-3">
