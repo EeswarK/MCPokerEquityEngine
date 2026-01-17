@@ -4,6 +4,9 @@
 
 import * as flatbuffers from 'flatbuffers';
 
+import { EvolutionPath } from '../telemetry/evolution-path.js';
+
+
 export class HandEquity {
   bb: flatbuffers.ByteBuffer|null = null;
   bb_pos = 0;
@@ -54,8 +57,48 @@ simulations():number {
   return offset ? this.bb!.readUint32(this.bb_pos + offset) : 0;
 }
 
+winMethodMatrix(index: number):number|null {
+  const offset = this.bb!.__offset(this.bb_pos, 16);
+  return offset ? this.bb!.readUint32(this.bb!.__vector(this.bb_pos + offset) + index * 4) : 0;
+}
+
+winMethodMatrixLength():number {
+  const offset = this.bb!.__offset(this.bb_pos, 16);
+  return offset ? this.bb!.__vector_len(this.bb_pos + offset) : 0;
+}
+
+winMethodMatrixArray():Uint32Array|null {
+  const offset = this.bb!.__offset(this.bb_pos, 16);
+  return offset ? new Uint32Array(this.bb!.bytes().buffer, this.bb!.bytes().byteOffset + this.bb!.__vector(this.bb_pos + offset), this.bb!.__vector_len(this.bb_pos + offset)) : null;
+}
+
+lossMethodMatrix(index: number):number|null {
+  const offset = this.bb!.__offset(this.bb_pos, 18);
+  return offset ? this.bb!.readUint32(this.bb!.__vector(this.bb_pos + offset) + index * 4) : 0;
+}
+
+lossMethodMatrixLength():number {
+  const offset = this.bb!.__offset(this.bb_pos, 18);
+  return offset ? this.bb!.__vector_len(this.bb_pos + offset) : 0;
+}
+
+lossMethodMatrixArray():Uint32Array|null {
+  const offset = this.bb!.__offset(this.bb_pos, 18);
+  return offset ? new Uint32Array(this.bb!.bytes().buffer, this.bb!.bytes().byteOffset + this.bb!.__vector(this.bb_pos + offset), this.bb!.__vector_len(this.bb_pos + offset)) : null;
+}
+
+evolutionPaths(index: number, obj?:EvolutionPath):EvolutionPath|null {
+  const offset = this.bb!.__offset(this.bb_pos, 20);
+  return offset ? (obj || new EvolutionPath()).__init(this.bb!.__indirect(this.bb!.__vector(this.bb_pos + offset) + index * 4), this.bb!) : null;
+}
+
+evolutionPathsLength():number {
+  const offset = this.bb!.__offset(this.bb_pos, 20);
+  return offset ? this.bb!.__vector_len(this.bb_pos + offset) : 0;
+}
+
 static startHandEquity(builder:flatbuffers.Builder) {
-  builder.startObject(6);
+  builder.startObject(9);
 }
 
 static addHandName(builder:flatbuffers.Builder, handNameOffset:flatbuffers.Offset) {
@@ -82,12 +125,70 @@ static addSimulations(builder:flatbuffers.Builder, simulations:number) {
   builder.addFieldInt32(5, simulations, 0);
 }
 
+static addWinMethodMatrix(builder:flatbuffers.Builder, winMethodMatrixOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(6, winMethodMatrixOffset, 0);
+}
+
+static createWinMethodMatrixVector(builder:flatbuffers.Builder, data:number[]|Uint32Array):flatbuffers.Offset;
+/**
+ * @deprecated This Uint8Array overload will be removed in the future.
+ */
+static createWinMethodMatrixVector(builder:flatbuffers.Builder, data:number[]|Uint8Array):flatbuffers.Offset;
+static createWinMethodMatrixVector(builder:flatbuffers.Builder, data:number[]|Uint32Array|Uint8Array):flatbuffers.Offset {
+  builder.startVector(4, data.length, 4);
+  for (let i = data.length - 1; i >= 0; i--) {
+    builder.addInt32(data[i]!);
+  }
+  return builder.endVector();
+}
+
+static startWinMethodMatrixVector(builder:flatbuffers.Builder, numElems:number) {
+  builder.startVector(4, numElems, 4);
+}
+
+static addLossMethodMatrix(builder:flatbuffers.Builder, lossMethodMatrixOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(7, lossMethodMatrixOffset, 0);
+}
+
+static createLossMethodMatrixVector(builder:flatbuffers.Builder, data:number[]|Uint32Array):flatbuffers.Offset;
+/**
+ * @deprecated This Uint8Array overload will be removed in the future.
+ */
+static createLossMethodMatrixVector(builder:flatbuffers.Builder, data:number[]|Uint8Array):flatbuffers.Offset;
+static createLossMethodMatrixVector(builder:flatbuffers.Builder, data:number[]|Uint32Array|Uint8Array):flatbuffers.Offset {
+  builder.startVector(4, data.length, 4);
+  for (let i = data.length - 1; i >= 0; i--) {
+    builder.addInt32(data[i]!);
+  }
+  return builder.endVector();
+}
+
+static startLossMethodMatrixVector(builder:flatbuffers.Builder, numElems:number) {
+  builder.startVector(4, numElems, 4);
+}
+
+static addEvolutionPaths(builder:flatbuffers.Builder, evolutionPathsOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(8, evolutionPathsOffset, 0);
+}
+
+static createEvolutionPathsVector(builder:flatbuffers.Builder, data:flatbuffers.Offset[]):flatbuffers.Offset {
+  builder.startVector(4, data.length, 4);
+  for (let i = data.length - 1; i >= 0; i--) {
+    builder.addOffset(data[i]!);
+  }
+  return builder.endVector();
+}
+
+static startEvolutionPathsVector(builder:flatbuffers.Builder, numElems:number) {
+  builder.startVector(4, numElems, 4);
+}
+
 static endHandEquity(builder:flatbuffers.Builder):flatbuffers.Offset {
   const offset = builder.endObject();
   return offset;
 }
 
-static createHandEquity(builder:flatbuffers.Builder, handNameOffset:flatbuffers.Offset, equity:number, wins:number, ties:number, losses:number, simulations:number):flatbuffers.Offset {
+static createHandEquity(builder:flatbuffers.Builder, handNameOffset:flatbuffers.Offset, equity:number, wins:number, ties:number, losses:number, simulations:number, winMethodMatrixOffset:flatbuffers.Offset, lossMethodMatrixOffset:flatbuffers.Offset, evolutionPathsOffset:flatbuffers.Offset):flatbuffers.Offset {
   HandEquity.startHandEquity(builder);
   HandEquity.addHandName(builder, handNameOffset);
   HandEquity.addEquity(builder, equity);
@@ -95,6 +196,9 @@ static createHandEquity(builder:flatbuffers.Builder, handNameOffset:flatbuffers.
   HandEquity.addTies(builder, ties);
   HandEquity.addLosses(builder, losses);
   HandEquity.addSimulations(builder, simulations);
+  HandEquity.addWinMethodMatrix(builder, winMethodMatrixOffset);
+  HandEquity.addLossMethodMatrix(builder, lossMethodMatrixOffset);
+  HandEquity.addEvolutionPaths(builder, evolutionPathsOffset);
   return HandEquity.endHandEquity(builder);
 }
 }

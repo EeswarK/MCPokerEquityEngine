@@ -2,6 +2,76 @@ import random
 
 from ....models.card import Card
 
+HAND_TYPE_NAMES = [
+    "High Card",
+    "One Pair",
+    "Two Pair",
+    "Three of a Kind",
+    "Straight",
+    "Flush",
+    "Full House",
+    "Four of a Kind",
+    "Straight Flush",
+    "Royal Flush",
+]
+
+def _categorize_hand_state(hole_cards: list[Card], board_cards: list[Card]) -> str:
+    """
+    Categorize current hand state based on hole cards and board.
+    Returns descriptive state like "Flush Draw", "Top Pair", etc.
+    """
+    if len(board_cards) < 3:
+        # Pre-flop: categorize by hole cards
+        ranks = sorted([c.rank for c in hole_cards], reverse=True)
+        if ranks[0] == ranks[1]:
+            return f"Pocket Pair ({ranks[0]})"
+        elif hole_cards[0].suit == hole_cards[1].suit:
+            return "Suited Cards"
+        else:
+            return "Offsuit Cards"
+
+    # Post-flop: evaluate current strength and draws
+    all_cards = hole_cards + board_cards
+
+    # Check for flush draw (4 cards of same suit)
+    suit_counts = {0: 0, 1: 0, 2: 0, 3: 0}
+    for card in all_cards:
+        suit_counts[card.suit] += 1
+    max_suit_count = max(suit_counts.values())
+
+    if max_suit_count == 4:
+        return "Flush Draw"
+
+    # Check for straight draw (simplified: 4 sequential cards)
+    ranks = sorted(set([c.rank for c in all_cards]))
+    for i in range(len(ranks) - 3):
+        if ranks[i+3] - ranks[i] == 3:
+            return "Straight Draw"
+
+    # Evaluate made hand
+    if len(all_cards) >= 5:
+        hand_value = evaluate_hand_naive(hole_cards, board_cards)
+        hand_type = get_hand_type(hand_value)
+
+        if hand_type >= 4:  # Straight or better
+            return HAND_TYPE_NAMES[hand_type]
+        elif hand_type == 3:
+            return "Three of a Kind"
+        elif hand_type == 2:
+            return "Two Pair"
+        elif hand_type == 1:
+            # Check if it's top pair
+            board_ranks = [c.rank for c in board_cards]
+            max_board_rank = max(board_ranks) if board_ranks else 0
+            hole_ranks = [c.rank for c in hole_cards]
+            if max(hole_ranks) >= max_board_rank:
+                return "Top Pair"
+            else:
+                return "Lower Pair"
+        else:
+            return "High Card"
+
+    return "Unknown"
 
 def evaluate_hand_naive(hole_cards: list[Card], board_cards: list[Card]) -> int:
     all_cards = list(hole_cards) + list(board_cards)
@@ -27,16 +97,17 @@ def evaluate_hand_naive(hole_cards: list[Card], board_cards: list[Card]) -> int:
     return best_value
 
 
-def simulate_hand_naive(hole_cards: list[Card], board: list[Card], num_opponents: int) -> tuple[int, int, int, str]:
+def simulate_hand_naive(hole_cards: list[Card], board: list[Card], num_opponents: int) -> tuple[int, int, int, str, list[str]]:
     """
     Simulate a poker hand and return outcome with hand type information.
 
     Returns:
-        tuple[int, int, int, str]: (outcome, our_hand_type, max_opponent_hand_type, opponent_hole_cards)
+        tuple[int, int, int, str, list[str]]: (outcome, our_hand_type, max_opponent_hand_type, opponent_hole_cards, evolution_path)
         - outcome: 1=win, 0=tie, -1=loss
         - our_hand_type: 0-9 (High Card to Royal Flush) at showdown
         - max_opponent_hand_type: 0-9 (High Card to Royal Flush) at showdown
         - opponent_hole_cards: Starting hand classification of best opponent (e.g., "AA", "AKs", "72o")
+        - evolution_path: List of hand states from pre-flop to river
     """
     deck = _create_deck()
     known_cards = set((c.rank, c.suit) for c in hole_cards + board)
@@ -44,20 +115,50 @@ def simulate_hand_naive(hole_cards: list[Card], board: list[Card], num_opponents
     for card in known_cards:
         deck.discard(card)
 
+    # Track evolution
+    evolution_path = []
+
+    # Pre-flop state
+    evolution_path.append(_categorize_hand_state(hole_cards, []))
+
     remaining_board = 5 - len(board)
     board_cards = list(board)
-
-    for _ in range(remaining_board):
+    
+    # Deal flop (3 cards if starting from pre-flop)
+    cards_to_deal = min(remaining_board, 3)
+    for _ in range(cards_to_deal):
         if not deck:
-            return (0, 0, 0, "??")
+            return (0, 0, 0, "??", evolution_path)
         card_tuple = random.choice(list(deck))
         deck.discard(card_tuple)
         board_cards.append(Card(rank=card_tuple[0], suit=card_tuple[1]))
+    
+    if cards_to_deal > 0:
+        evolution_path.append(_categorize_hand_state(hole_cards, board_cards))
+
+    remaining_board -= cards_to_deal
+
+    # Deal turn
+    if remaining_board > 0:
+        if deck:
+            card_tuple = random.choice(list(deck))
+            deck.discard(card_tuple)
+            board_cards.append(Card(rank=card_tuple[0], suit=card_tuple[1]))
+            evolution_path.append(_categorize_hand_state(hole_cards, board_cards))
+            remaining_board -= 1
+
+    # Deal river
+    if remaining_board > 0:
+        if deck:
+            card_tuple = random.choice(list(deck))
+            deck.discard(card_tuple)
+            board_cards.append(Card(rank=card_tuple[0], suit=card_tuple[1]))
+            evolution_path.append(_categorize_hand_state(hole_cards, board_cards))
 
     opponent_hands = []
     for _ in range(num_opponents):
         if len(deck) < 2:
-            return (0, 0, 0, "??")
+            return (0, 0, 0, "??", evolution_path)
         opp_card_tuples = random.sample(list(deck), 2)
         for card_tuple in opp_card_tuples:
             deck.discard(card_tuple)
@@ -76,11 +177,11 @@ def simulate_hand_naive(hole_cards: list[Card], board: list[Card], num_opponents
     opponent_hole_classification = classify_hole_cards(opponent_hands[max_opponent_idx]) if opponent_hands else "??"
 
     if our_hand_value > max_opponent:
-        return (1, our_hand_type, max_opponent_hand_type, opponent_hole_classification)
+        return (1, our_hand_type, max_opponent_hand_type, opponent_hole_classification, evolution_path)
     elif our_hand_value == max_opponent:
-        return (0, our_hand_type, max_opponent_hand_type, opponent_hole_classification)
+        return (0, our_hand_type, max_opponent_hand_type, opponent_hole_classification, evolution_path)
     else:
-        return (-1, our_hand_type, max_opponent_hand_type, opponent_hole_classification)
+        return (-1, our_hand_type, max_opponent_hand_type, opponent_hole_classification, evolution_path)
 
 
 def _create_deck() -> set:

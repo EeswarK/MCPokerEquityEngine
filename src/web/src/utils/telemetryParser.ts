@@ -4,6 +4,7 @@ import {
   PerformanceMetrics,
   TelemetryUpdate,
   JobStatus,
+  EvolutionPathData
 } from "../api/contract";
 
 interface BinaryTelemetryData {
@@ -77,6 +78,7 @@ export function parseTelemetryPacket(
     const sampleCounts: Record<string, number> = {};
     const winMethodMatrices: Record<string, number[][]> = {};
     const lossMethodMatrices: Record<string, number[][]> = {};
+    const evolutionPaths: Record<string, EvolutionPathData[]> = {};
     const equityResultsLength = packet.equityResultsLength();
 
     for (let i = 0; i < equityResultsLength; i++) {
@@ -121,6 +123,24 @@ export function parseTelemetryPacket(
               lossMethodMatrices[normalizedHandName] = matrix;
             }
           }
+
+          // Parse evolution paths
+          if (typeof handEquity.evolutionPathsLength === 'function') {
+            const pathsLength = handEquity.evolutionPathsLength();
+            const paths: EvolutionPathData[] = [];
+            for (let p = 0; p < pathsLength; p++) {
+              const path = handEquity.evolutionPaths(p);
+              if (path) {
+                paths.push({
+                  pathString: path.pathString() || "",
+                  count: path.count(),
+                });
+              }
+            }
+            if (paths.length > 0) {
+              evolutionPaths[normalizedHandName] = paths;
+            }
+          }
         }
       }
     }
@@ -161,6 +181,7 @@ export function parseTelemetryPacket(
       sample_counts: sampleCounts,
       win_method_matrices: winMethodMatrices,
       loss_method_matrices: lossMethodMatrices,
+      evolution_paths: evolutionPaths,
       metrics,
       timestamp: new Date(
         Number(data.timestamp_ns / BigInt(1e6))
@@ -172,6 +193,7 @@ export function parseTelemetryPacket(
       currentResultsKeys: Object.keys(currentResults),
       sampleCountsKeys: Object.keys(sampleCounts),
       winMethodMatricesKeys: Object.keys(winMethodMatrices),
+      evolutionPathsKeys: Object.keys(evolutionPaths),
       metricsSimsPerSec: metrics.simulations_per_second,
     });
 

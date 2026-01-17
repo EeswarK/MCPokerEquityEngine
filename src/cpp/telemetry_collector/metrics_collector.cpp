@@ -5,18 +5,22 @@
 #include <unistd.h>
 #include <sys/resource.h>
 #include <sys/ioctl.h>
-#include <sys/syscall.h>
-#include <linux/perf_event.h>
-#include <asm/unistd.h>
 #include <cerrno>
 #include <cstring>
 #include <chrono>
 #include <iostream>
 
+#if defined(__linux__)
+#include <sys/syscall.h>
+#include <linux/perf_event.h>
+#include <asm/unistd.h>
+#endif
+
 MetricsCollector::MetricsCollector(pid_t pid)
     : target_pid(pid), perf_fd(-1), last_utime(0), last_stime(0), last_timestamp_ns(0) {}
 
 bool MetricsCollector::initialize() {
+#if defined(__linux__)
     std::ifstream paranoid_file("/proc/sys/kernel/perf_event_paranoid");
     if (paranoid_file.is_open()) {
         int paranoid_level;
@@ -55,14 +59,22 @@ bool MetricsCollector::initialize() {
         perf_fd = -1;
         return true;
     }
-
     return true;
+#else
+    // macOS/other: CPU cycles monitoring not implemented
+    return true;
+#endif
 }
 
 ProcessMetrics MetricsCollector::collect() {
     ProcessMetrics metrics = {};
     metrics.cpu_cycles = 0;
+    metrics.cpu_percent = 0.0;
+    metrics.memory_rss_kb = 0;
+    metrics.memory_vms_kb = 0;
+    metrics.thread_count = 0;
 
+#if defined(__linux__)
     std::string stat_path = "/proc/" + std::to_string(target_pid) + "/stat";
     std::ifstream stat_file(stat_path);
     if (stat_file.is_open()) {
@@ -102,11 +114,7 @@ ProcessMetrics MetricsCollector::collect() {
                 long clock_ticks_per_sec = sysconf(_SC_CLK_TCK);
                 double cpu_time_diff = static_cast<double>(time_diff) / clock_ticks_per_sec;
                 metrics.cpu_percent = (cpu_time_diff / seconds_diff) * 100.0;
-            } else {
-                metrics.cpu_percent = 0.0;
             }
-        } else {
-            metrics.cpu_percent = 0.0;
         }
 
         last_utime = utime;
@@ -140,12 +148,9 @@ ProcessMetrics MetricsCollector::collect() {
         ssize_t bytes_read = read(perf_fd, &cycles, sizeof(cycles));
         if (bytes_read == sizeof(cycles)) {
             metrics.cpu_cycles = cycles;
-        } else {
-            metrics.cpu_cycles = 0;
         }
-    } else {
-        metrics.cpu_cycles = 0;
     }
+#endif
 
     return metrics;
 }
@@ -155,9 +160,11 @@ MetricsCollector::~MetricsCollector() {
 }
 
 void MetricsCollector::cleanup() {
+#if defined(__linux__)
     if (perf_fd >= 0) {
         ioctl(perf_fd, PERF_EVENT_IOC_DISABLE, 0);
         close(perf_fd);
         perf_fd = -1;
     }
+#endif
 }

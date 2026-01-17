@@ -1,5 +1,10 @@
 namespace Telemetry;
 
+table EvolutionPath {
+  path_string:string;
+  count:uint;
+}
+
 table HandEquity {
   hand_name:string;
   equity:double;
@@ -9,6 +14,7 @@ table HandEquity {
   simulations:uint;
   win_method_matrix:[uint];   // Flattened 10x10 matrix (100 elements): [our_type * 10 + opp_type]
   loss_method_matrix:[uint];  // Flattened 10x10 matrix (100 elements): [opp_type * 10 + our_type]
+  evolution_paths:[EvolutionPath]; // Top evolution paths
 }
 
 table TelemetryPacket {

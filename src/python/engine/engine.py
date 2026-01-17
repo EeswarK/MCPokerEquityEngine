@@ -1,4 +1,4 @@
-from typing import Callable, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
 from ..models.card import Card
 from ..models.job import EquityResult, JobRequest
@@ -100,12 +100,12 @@ class EquityEngine:
         results: Optional[Dict[str, EquityResult]] = None,
     ) -> EquityResult:
         # Track equity by opponent hand type
-        # opponent_hand -> {wins, ties, losses, total, win_matrix, loss_matrix}
+        # opponent_hand -> {wins, ties, losses, total, win_matrix, loss_matrix, evolution_paths}
         opponent_stats: Dict[str, Dict[str, Any]] = {} 
         update_interval = 1000  # Update shared memory every 1000 simulations
 
         for sim_num in range(num_simulations):
-            outcome, our_type, opp_type, opp_hand_classification = self.simulate_hand(hole_cards, board, num_opponents)
+            outcome, our_type, opp_type, opp_hand_classification, evolution_path = self.simulate_hand(hole_cards, board, num_opponents)
 
             # Initialize stats for this opponent hand type if not seen before
             if opp_hand_classification not in opponent_stats:
@@ -115,7 +115,8 @@ class EquityEngine:
                     "losses": 0, 
                     "total": 0,
                     "win_matrix": [[0] * 10 for _ in range(10)],
-                    "loss_matrix": [[0] * 10 for _ in range(10)]
+                    "loss_matrix": [[0] * 10 for _ in range(10)],
+                    "evolution_paths": {}
                 }
 
             stats = opponent_stats[opp_hand_classification]
@@ -129,6 +130,10 @@ class EquityEngine:
             else:  # outcome == -1 (loss)
                 stats["losses"] += 1
                 stats["loss_matrix"][opp_type][our_type] += 1  # Note: reversed indices
+
+            # Track evolution path
+            path_key = "->".join(evolution_path)
+            stats["evolution_paths"][path_key] = stats["evolution_paths"].get(path_key, 0) + 1
 
             # Periodically update shared memory with partial results
             if self.shm_writer and results is not None and (sim_num + 1) % update_interval == 0:
@@ -152,6 +157,7 @@ class EquityEngine:
                         total_simulations=total,
                         win_method_matrix=stats_dict["win_matrix"],
                         loss_method_matrix=stats_dict["loss_matrix"],
+                        evolution_paths=stats_dict["evolution_paths"]
                     )
 
                 self.shm_writer.update_equity_results(results)
@@ -171,6 +177,7 @@ class EquityEngine:
                 total_simulations=total,
                 win_method_matrix=stats_dict["win_matrix"],
                 loss_method_matrix=stats_dict["loss_matrix"],
+                evolution_paths=stats_dict["evolution_paths"]
             )
 
         # Debug logging
@@ -192,12 +199,16 @@ class EquityEngine:
         # Aggregate matrices for overall summary
         overall_win_matrix = [[0] * 10 for _ in range(10)]
         overall_loss_matrix = [[0] * 10 for _ in range(10)]
-        
+        overall_evolution_paths = {}
+
         for stats in opponent_stats.values():
             for i in range(10):
                 for j in range(10):
                     overall_win_matrix[i][j] += stats["win_matrix"][i][j]
                     overall_loss_matrix[i][j] += stats["loss_matrix"][i][j]
+            
+            for path, count in stats["evolution_paths"].items():
+                overall_evolution_paths[path] = overall_evolution_paths.get(path, 0) + count
 
         overall_equity = (total_wins + total_ties * 0.5) / total_sims if total_sims > 0 else 0.0
 
@@ -210,6 +221,7 @@ class EquityEngine:
             total_simulations=total_sims,
             win_method_matrix=overall_win_matrix,
             loss_method_matrix=overall_loss_matrix,
+            evolution_paths=overall_evolution_paths
         )
 
     def get_mode(self) -> str:

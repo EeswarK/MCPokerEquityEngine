@@ -2,5 +2,6 @@
 
 /* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any, @typescript-eslint/no-non-null-assertion */
 
+export { EvolutionPath } from './telemetry/evolution-path.js';
 export { HandEquity } from './telemetry/hand-equity.js';
 export { TelemetryPacket } from './telemetry/telemetry-packet.js';

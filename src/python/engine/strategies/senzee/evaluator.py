@@ -6,6 +6,86 @@ from .card import Card as SenzeeCard
 from .lookup import LookupTable
 from ....models.card import Card as PublicCard
 
+HAND_TYPE_NAMES = [
+    "High Card",
+    "One Pair",
+    "Two Pair",
+    "Three of a Kind",
+    "Straight",
+    "Flush",
+    "Full House",
+    "Four of a Kind",
+    "Straight Flush",
+    "Royal Flush",
+]
+
+def _categorize_hand_state(hole_cards: list[PublicCard], board_cards: list[PublicCard]) -> str:
+    """
+    Categorize current hand state based on hole cards and board.
+    Returns descriptive state like "Flush Draw", "Top Pair", etc.
+    """
+    if len(board_cards) < 3:
+        # Pre-flop: categorize by hole cards
+        ranks = sorted([c.rank for c in hole_cards], reverse=True)
+        if ranks[0] == ranks[1]:
+            return f"Pocket Pair ({ranks[0]})"
+        elif hole_cards[0].suit == hole_cards[1].suit:
+            return "Suited Cards"
+        else:
+            return "Offsuit Cards"
+
+    # Post-flop: evaluate current strength and draws
+    all_cards = hole_cards + board_cards
+
+    # Check for flush draw (4 cards of same suit)
+    suit_counts = {0: 0, 1: 0, 2: 0, 3: 0}
+    for card in all_cards:
+        suit_counts[card.suit] += 1
+    max_suit_count = max(suit_counts.values())
+
+    if max_suit_count == 4:
+        return "Flush Draw"
+
+    # Check for straight draw (simplified: 4 sequential ranks)
+    ranks = sorted(set([c.rank for c in all_cards]))
+    for i in range(len(ranks) - 3):
+        if ranks[i+3] - ranks[i] == 3:
+            return "Straight Draw"
+
+    # Evaluate made hand
+    if len(all_cards) >= 5:
+        # Use Senzee evaluator
+        val = evaluate_hand_senzee(hole_cards, board_cards)
+        # Convert val back to type (0-9)
+        # val = 9000000 - (rank - 1) * (9000000 / 7461)
+        # We can just call get_rank_class if we had the raw rank
+        # Or just re-evaluate raw rank here
+        evaluator = _get_evaluator()
+        senzee_cards = _convert_cards(all_cards)
+        raw_rank = evaluator.evaluate(senzee_cards[:2], senzee_cards[2:])
+        hand_type_senzee = evaluator.get_rank_class(raw_rank)
+        hand_type = 9 - hand_type_senzee
+
+        if hand_type >= 4:  # Straight or better
+            return HAND_TYPE_NAMES[hand_type]
+        elif hand_type == 3:
+            return "Three of a Kind"
+        elif hand_type == 2:
+            return "Two Pair"
+        elif hand_type == 1:
+            # Check if it's top pair
+            board_ranks = [c.rank for c in board_cards]
+            max_board_rank = max(board_ranks) if board_ranks else 0
+            hole_ranks = [c.rank for c in hole_cards]
+            if max(hole_ranks) >= max_board_rank:
+                return "Top Pair"
+            else:
+                return "Lower Pair"
+        else:
+            return "High Card"
+
+    return "Unknown"
+
 
 class _Evaluator:
     """
@@ -146,16 +226,17 @@ def evaluate_hand_senzee(hole_cards: list[PublicCard], board_cards: list[PublicC
 
 def simulate_hand_senzee(
     hole_cards: list[PublicCard], board: list[PublicCard], num_opponents: int
-) -> tuple[int, int, int, str]:
+) -> tuple[int, int, int, str, list[str]]:
     """
     Simulate a poker hand and return outcome.
 
     Returns:
-        tuple[int, int, int, str]: (outcome, our_type, opp_type, opp_hand_classification)
+        tuple[int, int, int, str, list[str]]: (outcome, our_type, opp_type, opp_hand_classification, evolution_path)
         - outcome: 1=win, 0=tie, -1=loss
         - our_type: 0-9 (High Card to Royal Flush)
         - opp_type: 0-9 (High Card to Royal Flush)
         - opp_hand_classification: "AA", "AKs", etc.
+        - evolution_path: List of hand states
     """
     # Create deck
     deck = _create_deck()
@@ -164,29 +245,58 @@ def simulate_hand_senzee(
     for card in known_cards:
         deck.discard(card)
 
+    # Track evolution
+    evolution_path = []
+
+    # Pre-flop state
+    evolution_path.append(_categorize_hand_state(hole_cards, []))
+
     # Deal remaining board
     remaining_board = 5 - len(board)
     board_cards = list(board)
 
-    for _ in range(remaining_board):
+    # Deal flop (3 cards if starting from pre-flop)
+    cards_to_deal = min(remaining_board, 3)
+    for _ in range(cards_to_deal):
         if not deck:
-            return (0, 0, 0, "??")
+            return (0, 0, 0, "??", evolution_path)
         card_tuple = random.choice(list(deck))
         deck.discard(card_tuple)
         board_cards.append(PublicCard(rank=card_tuple[0], suit=card_tuple[1]))
+    
+    if cards_to_deal > 0:
+        evolution_path.append(_categorize_hand_state(hole_cards, board_cards))
+
+    remaining_board -= cards_to_deal
+
+    # Deal turn
+    if remaining_board > 0:
+        if deck:
+            card_tuple = random.choice(list(deck))
+            deck.discard(card_tuple)
+            board_cards.append(PublicCard(rank=card_tuple[0], suit=card_tuple[1]))
+            evolution_path.append(_categorize_hand_state(hole_cards, board_cards))
+            remaining_board -= 1
+
+    # Deal river
+    if remaining_board > 0:
+        if deck:
+            card_tuple = random.choice(list(deck))
+            deck.discard(card_tuple)
+            board_cards.append(PublicCard(rank=card_tuple[0], suit=card_tuple[1]))
+            evolution_path.append(_categorize_hand_state(hole_cards, board_cards))
 
     # Deal opponent hands
     opponent_hands = []
     for _ in range(num_opponents):
         if len(deck) < 2:
-            return (0, 0, 0, "??")
+            return (0, 0, 0, "??", evolution_path)
         opp_card_tuples = random.sample(list(deck), 2)
         for card_tuple in opp_card_tuples:
             deck.discard(card_tuple)
         opponent_hands.append([PublicCard(rank=t[0], suit=t[1]) for t in opp_card_tuples])
 
     # Evaluate hands
-    # Note: we need the raw rank (lower better) for comparison first to avoid precision issues with normalization
     evaluator = _get_evaluator()
     our_senzee = _convert_cards(hole_cards + board_cards)
     opp_senzees = [_convert_cards(hand + board_cards) for hand in opponent_hands]
@@ -197,36 +307,21 @@ def simulate_hand_senzee(
     min_opponent_rank = min(opp_ranks) if opp_ranks else LookupTable.MAX_HIGH_CARD + 1
     min_opponent_idx = opp_ranks.index(min_opponent_rank) if opp_ranks else 0
 
-    # Get hand types (0-9, 9=Royal Flush in naive? No. Naive uses 8=Straight Flush, 9=Royal Flush?
-    # Wait, Naive evaluator returns int, simulate returns type index.
-    # In naive: 0=High Card, 8=Straight Flush, 9=Royal Flush?
-    # Let's check LookupTable: 0=Royal Flush, 9=High Card.
-    # We need to map Senzee (0=Best) to Naive (0=Worst) or whatever Naive expects.
-    # Let's check `api/models.py` or naive implementation.
-    
-    # Actually, `simulate_hand` interface expects `our_type` to be int.
-    # In `base.py` (naive), it returned `evaluator.evaluate_hand(...)` which was just a score.
-    # But `simulate_hand` returns `(outcome, our_type, ...)`
-    # In Naive: `our_type = get_hand_type(our_score)` or something.
-    # Let's check `naive/evaluator.py`.
-    
-    our_hand_type_senzee = evaluator.get_rank_class(our_rank) # 0=Best (Royal)
+    our_hand_type_senzee = evaluator.get_rank_class(our_rank)
     opp_hand_type_senzee = evaluator.get_rank_class(min_opponent_rank)
     
-    # Invert for consistency if Naive uses 0=High Card, 9=Royal Flush
-    # Standard typically: 0=High Card, ... 9=Royal Flush.
     our_hand_type = 9 - our_hand_type_senzee
     max_opponent_hand_type = 9 - opp_hand_type_senzee
 
     # Classify opponent's starting hand
     opponent_hole_classification = _classify_hole_cards(opponent_hands[min_opponent_idx]) if opponent_hands else "??"
 
-    if our_rank < min_opponent_rank: # Lower is better in Senzee
-        return (1, our_hand_type, max_opponent_hand_type, opponent_hole_classification)
+    if our_rank < min_opponent_rank:
+        return (1, our_hand_type, max_opponent_hand_type, opponent_hole_classification, evolution_path)
     elif our_rank == min_opponent_rank:
-        return (0, our_hand_type, max_opponent_hand_type, opponent_hole_classification)
+        return (0, our_hand_type, max_opponent_hand_type, opponent_hole_classification, evolution_path)
     else:
-        return (-1, our_hand_type, max_opponent_hand_type, opponent_hole_classification)
+        return (-1, our_hand_type, max_opponent_hand_type, opponent_hole_classification, evolution_path)
 
 
 def _create_deck() -> set:

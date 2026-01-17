@@ -59,7 +59,7 @@ int main(int argc, char* argv[]) {
 
                 ProcessMetrics metrics = metrics_collector.collect();
 
-                flatbuffers::FlatBufferBuilder builder(8192);  // Larger buffer for equity results
+                flatbuffers::FlatBufferBuilder builder(262144);  // Larger buffer for equity results and evolution paths
 
                 // Build equity results vector
                 std::vector<flatbuffers::Offset<Telemetry::HandEquity>> equity_results_vec;
@@ -82,6 +82,17 @@ int main(int argc, char* argv[]) {
                         }
                     }
 
+                    // Build evolution paths
+                    std::vector<flatbuffers::Offset<Telemetry::EvolutionPath>> evolution_paths_vec;
+                    for (uint32_t p = 0; p < equity_snapshot.results[i].evolution_path_count && p < 10; p++) {
+                        auto path = Telemetry::CreateEvolutionPathDirect(
+                            builder,
+                            equity_snapshot.results[i].evolution_paths[p].path_string,
+                            equity_snapshot.results[i].evolution_paths[p].count
+                        );
+                        evolution_paths_vec.push_back(path);
+                    }
+
                     auto hand_equity = Telemetry::CreateHandEquityDirect(
                         builder,
                         equity_snapshot.hand_names[i],
@@ -91,7 +102,8 @@ int main(int argc, char* argv[]) {
                         equity_snapshot.results[i].losses,
                         equity_snapshot.results[i].simulations,
                         &win_matrix_flat,
-                        &loss_matrix_flat
+                        &loss_matrix_flat,
+                        &evolution_paths_vec
                     );
                     equity_results_vec.push_back(hand_equity);
                 }

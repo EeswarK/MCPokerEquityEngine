@@ -46,6 +46,11 @@ export interface PerformanceMetrics {
   branch_misses?: number; // Future: from perf counters
 }
 
+export interface EvolutionPathData {
+  pathString: string;
+  count: number;
+}
+
 export interface TelemetryUpdate {
   job_id: string;
   status: JobStatus;
@@ -54,6 +59,7 @@ export interface TelemetryUpdate {
   sample_counts: Record<string, number>; // hand_name -> simulation count
   win_method_matrices: Record<string, number[][]>; // hand_name -> 10x10 matrix [our_type][opp_type]
   loss_method_matrices: Record<string, number[][]>; // hand_name -> 10x10 matrix [opp_type][our_type]
+  evolution_paths?: Record<string, EvolutionPathData[]>; // hand_name -> list of paths
   metrics: PerformanceMetrics;
   timestamp: string; // ISO 8601
 }
@@ -63,6 +69,8 @@ export interface ErrorResponse {
   code: string;
   details?: Record<string, unknown>;
 }
+
+export { JobStatus, EngineMode };
 
 // WebSocket Message Types
 export type WebSocketMessage =

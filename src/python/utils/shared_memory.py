@@ -9,6 +9,13 @@ from typing import Optional, Dict
 MAX_HANDS = 169
 
 
+class EvolutionPathEntry(Structure):
+    _fields_ = [
+        ("path_string", c_char * 200),
+        ("count", c_uint32),
+    ]
+
+
 class HandEquityResult(Structure):
     _fields_ = [
         ("equity", c_double),                    # 8 bytes
@@ -18,7 +25,9 @@ class HandEquityResult(Structure):
         ("simulations", c_uint32),               # 4 bytes
         ("win_method_matrix", (c_uint32 * 10) * 10),  # 400 bytes (10x10 matrix)
         ("loss_method_matrix", (c_uint32 * 10) * 10),  # 400 bytes (10x10 matrix)
-        ("_padding", c_uint32 * 2),              # 8 bytes (total 832 bytes)
+        ("evolution_path_count", c_uint32),      # 4 bytes
+        ("evolution_paths", EvolutionPathEntry * 10), # 2040 bytes
+        ("_padding", c_uint32 * 3),              # 12 bytes (total 2880 bytes)
     ]
 
 
@@ -53,7 +62,7 @@ class CompleteSharedMemory(Structure):
 class SharedMemoryWriter:
     def __init__(self, job_id: str):
         self.job_id = job_id
-        self.shm_name = f"/poker_telemetry_{job_id}"
+        self.shm_name = f"/poker_telemetry_{{job_id}}"
         self.shm_fd: Optional[int] = None
         self.shm_mmap: Optional[mmap.mmap] = None
         self.data: Optional[CompleteSharedMemory] = None
@@ -82,7 +91,7 @@ class SharedMemoryWriter:
         except Exception as e:
             import logging
 
-            logging.warning(f"Failed to create shared memory {self.shm_name}: {e}")
+            logging.warning(f"Failed to create shared memory {{self.shm_name}}: {{e}}")
             return False
 
     def update_hands(self, count: int):
@@ -153,6 +162,24 @@ class SharedMemoryWriter:
                     for our_type in range(10):
                         self.data.equity_results.results[idx].loss_method_matrix[opp_type][our_type] = \
                             result.loss_method_matrix[opp_type][our_type]
+
+            # Write evolution paths (top 10)
+            if result.evolution_paths is not None:
+                sorted_paths = sorted(
+                    result.evolution_paths.items(),
+                    key=lambda x: x[1],
+                    reverse=True
+                )[:10]
+
+                self.data.equity_results.results[idx].evolution_path_count = len(sorted_paths)
+                for p_idx, (path_str, count) in enumerate(sorted_paths):
+                    path_bytes = path_str.encode('utf-8')[:199]
+                    # Ensure null-termination and clean buffer by padding with zeros
+                    padded_bytes = path_bytes.ljust(200, b'\0')
+                    self.data.equity_results.results[idx].evolution_paths[p_idx].path_string = padded_bytes
+                    self.data.equity_results.results[idx].evolution_paths[p_idx].count = count
+            else:
+                self.data.equity_results.results[idx].evolution_path_count = 0
 
         self.data.equity_results.seq += 1
 

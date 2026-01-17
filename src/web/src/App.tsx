@@ -7,6 +7,7 @@ import { ThemeToggle } from "./components/ThemeToggle";
 import { CardPicker } from "./components/CardPicker";
 import { WinMethodChart } from "./components/WinMethodChart";
 import { EquityCategoryChart } from "./components/EquityCategoryChart";
+import { HandEvolutionSankey } from "./components/HandEvolutionSankey";
 import { SimulationCountSelector } from "./components/SimulationCountSelector";
 import { useJob } from "./hooks/useJob";
 import { EngineMode, Card as CardType } from "./types";
@@ -112,6 +113,8 @@ function App() {
         hasSampleCounts: Object.keys(telemetry.sample_counts).length > 0,
         hasWinMethodMatrices:
           Object.keys(telemetry.win_method_matrices || {}).length > 0,
+        hasEvolutionPaths:
+          Object.keys(telemetry.evolution_paths || {}).length > 0,
       });
 
       // Filter out first few data points if they're unreasonably high (warm-up artifacts)
@@ -264,6 +267,14 @@ function App() {
                   lossMethodMatrices={telemetry.loss_method_matrices}
                 />
               )}
+
+            {/* Hand Evolution Sankey Diagram */}
+            {telemetry.evolution_paths && Object.keys(telemetry.evolution_paths).length > 0 && (
+              <HandEvolutionSankey
+                handName={Object.keys(telemetry.evolution_paths)[0]}
+                evolutionPaths={telemetry.evolution_paths[Object.keys(telemetry.evolution_paths)[0]]}
+              />
+            )}
 
             {telemetry.win_method_matrices &&
             Object.keys(telemetry.win_method_matrices).length > 0 ? (

@@ -56,12 +56,15 @@ class EquityResult:
     total_simulations: int = 0
     win_method_matrix: Optional[List[List[int]]] = None
     loss_method_matrix: Optional[List[List[int]]] = None
+    evolution_paths: Optional[Dict[str, int]] = None
 
     def __post_init__(self):
         if self.win_method_matrix is None:
             self.win_method_matrix = [[0] * 10 for _ in range(10)]
         if self.loss_method_matrix is None:
             self.loss_method_matrix = [[0] * 10 for _ in range(10)]
+        if self.evolution_paths is None:
+            self.evolution_paths = {}
 
     def to_dict(self) -> Dict:
         return {

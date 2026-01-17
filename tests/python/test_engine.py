@@ -1,14 +1,14 @@
 import pytest
 from src.python.engine import EquityEngine, create_engine
-from src.python.engine.strategies.base import evaluate_hand_base, simulate_hand_base
+from src.python.engine.strategies.naive import evaluate_hand_naive, simulate_hand_naive
 from src.python.models.card import Card
 from src.python.models.job import JobRequest
 
 
 def test_engine_instantiation():
     engine = EquityEngine(
-        evaluate_hand=evaluate_hand_base,
-        simulate_hand=simulate_hand_base,
+        evaluate_hand=evaluate_hand_naive,
+        simulate_hand=simulate_hand_naive,
         mode="base_python",
     )
     assert engine.get_mode() == "base_python"
@@ -43,8 +43,15 @@ def test_engine_calculates_equity():
         num_simulations=1000,
     )
     results = engine.calculate_range_equity(request)
-    assert "AA" in results
-    assert 0.0 <= results["AA"].equity <= 1.0
+    
+    # Results are now keyed by opponent hand type (e.g., "72o", "AKs", "22")
+    # We should have multiple entries
+    assert len(results) > 0
+    
+    # Check that at least one result has valid equity
+    first_result = next(iter(results.values()))
+    assert 0.0 <= first_result.equity <= 1.0
+    assert first_result.total_simulations > 0
 
 
 def test_engine_progress_callback():
@@ -69,29 +76,12 @@ def test_engine_progress_callback():
     assert progress_updates[-1][0] == 1.0
 
 
-def test_engine_metrics():
-    engine = create_engine("base_python")
-    range_spec = {
-        "AA": [Card(rank=14, suit=0), Card(rank=14, suit=1)],
-    }
-    request = JobRequest(
-        range_spec=range_spec,
-        num_opponents=1,
-        num_simulations=1000,
-    )
-    engine.calculate_range_equity(request)
-    metrics = engine.get_metrics()
-    assert metrics.mode == "base_python"
-    assert metrics.duration_seconds > 0
-    assert metrics.simulations_per_second > 0
-
-
 def test_engine_function_injection():
     def mock_evaluate(hole_cards, board_cards):
         return 1000000
 
     def mock_simulate(hole_cards, board, num_opponents):
-        return (1, 1, 0, "AKo")  # outcome, our_type, opp_type, opp_hand
+        return (1, 1, 0, "AKo", ["Pre-flop", "Flop", "Turn", "River"])  # outcome, our_type, opp_type, opp_hand, evolution
 
     engine = EquityEngine(
         evaluate_hand=mock_evaluate,

@@ -9,6 +9,12 @@
 // Maximum number of poker hands in 13x13 matrix (pairs + suited + offsuit)
 #define MAX_HANDS 169
 
+// Evolution path entry (204 bytes)
+struct EvolutionPathEntry {
+    char path_string[200];
+    uint32_t count;
+};
+
 // Per-hand equity result
 struct HandEquityResult {
     double equity;        // Win rate (0.0 to 1.0)
@@ -18,10 +24,12 @@ struct HandEquityResult {
     uint32_t simulations; // Total simulations for this hand
     uint32_t win_method_matrix[10][10];   // Win frequency by hand type: [our_type][opp_type]
     uint32_t loss_method_matrix[10][10];  // Loss frequency by hand type: [opp_type][our_type]
-    uint32_t _padding[2]; // Padding to make total 832 bytes (8 + 4 + 4 + 4 + 4 + 400 + 400 + 8 = 832)
+    uint32_t evolution_path_count;        // Number of evolution paths
+    EvolutionPathEntry evolution_paths[10]; // Top 10 evolution paths
+    uint32_t _padding[3]; // Padding to make total 2880 bytes
 };
 
-static_assert(sizeof(HandEquityResult) == 832, "HandEquityResult must be 832 bytes");
+static_assert(sizeof(HandEquityResult) == 2880, "HandEquityResult must be 2880 bytes");
 
 // Equity results segment (follows telemetry struct in shared memory)
 struct EquityResultsSegment {

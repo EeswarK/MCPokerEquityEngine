@@ -12,8 +12,10 @@ def test_evaluate_hand_naive():
 def test_simulate_hand_naive():
     hole_cards = [Card(rank=14, suit=0), Card(rank=14, suit=1)]
     board = []
-    outcome, our_type, opp_type, opp_hand = simulate_hand_naive(hole_cards, board, 1)
+    outcome, our_type, opp_type, opp_hand, evolution_path = simulate_hand_naive(hole_cards, board, 1)
     assert outcome in [-1, 0, 1]
     assert 0 <= our_type <= 9
     assert 0 <= opp_type <= 9
     assert isinstance(opp_hand, str)
+    assert isinstance(evolution_path, list)
+    assert len(evolution_path) > 0
