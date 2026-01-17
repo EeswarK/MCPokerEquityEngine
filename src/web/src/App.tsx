@@ -14,7 +14,7 @@ import { Button } from "./components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 
 function App() {
-  const [mode, setMode] = useState<EngineMode>("base_python");
+  const [mode, setMode] = useState<EngineMode>("senzee");
   const [numWorkers, setNumWorkers] = useState(4);
   const [numSimulations, setNumSimulations] = useState(100000);
   const [card1, setCard1] = useState<CardType | null>(null);
@@ -261,6 +261,7 @@ function App() {
                 <EquityCategoryChart
                   equityData={telemetry.current_results}
                   winMethodMatrices={telemetry.win_method_matrices}
+                  lossMethodMatrices={telemetry.loss_method_matrices}
                 />
               )}
 

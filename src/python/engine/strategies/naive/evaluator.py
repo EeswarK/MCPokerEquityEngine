@@ -1,9 +1,9 @@
 import random
 
-from ...models.card import Card
+from ....models.card import Card
 
 
-def evaluate_hand_base(hole_cards: list[Card], board_cards: list[Card]) -> int:
+def evaluate_hand_naive(hole_cards: list[Card], board_cards: list[Card]) -> int:
     all_cards = list(hole_cards) + list(board_cards)
     if len(all_cards) < 5:
         return 0
@@ -27,7 +27,7 @@ def evaluate_hand_base(hole_cards: list[Card], board_cards: list[Card]) -> int:
     return best_value
 
 
-def simulate_hand_base(hole_cards: list[Card], board: list[Card], num_opponents: int) -> tuple[int, int, int, str]:
+def simulate_hand_naive(hole_cards: list[Card], board: list[Card], num_opponents: int) -> tuple[int, int, int, str]:
     """
     Simulate a poker hand and return outcome with hand type information.
 
@@ -63,8 +63,8 @@ def simulate_hand_base(hole_cards: list[Card], board: list[Card], num_opponents:
             deck.discard(card_tuple)
         opponent_hands.append([Card(rank=t[0], suit=t[1]) for t in opp_card_tuples])
 
-    our_hand_value = evaluate_hand_base(hole_cards, board_cards)
-    opponent_values = [evaluate_hand_base(hand, board_cards) for hand in opponent_hands]
+    our_hand_value = evaluate_hand_naive(hole_cards, board_cards)
+    opponent_values = [evaluate_hand_naive(hand, board_cards) for hand in opponent_hands]
 
     max_opponent = max(opponent_values) if opponent_values else 0
     max_opponent_idx = opponent_values.index(max_opponent) if opponent_values else 0

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   BarChart,
   Bar,
@@ -20,6 +20,7 @@ import {
 interface EquityCategoryChartProps {
   equityData: Record<string, number>;
   winMethodMatrices: Record<string, number[][]>;
+  lossMethodMatrices: Record<string, number[][]>;
 }
 
 const HAND_TYPE_NAMES = [
@@ -80,62 +81,78 @@ const categorizeHand = (handName: string): string => {
 export const EquityCategoryChart: React.FC<EquityCategoryChartProps> = ({
   equityData,
   winMethodMatrices,
+  lossMethodMatrices,
 }) => {
   const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
-  const [hoveredMatrix, setHoveredMatrix] = useState<number[][] | null>(null);
+  const [hoveredData, setHoveredData] = useState<{winMatrix: number[][], lossMatrix: number[][]}>();
 
   // Aggregate equity by category
-  const categories = new Map<string, { totalEquity: number; count: number; matrix: number[][] }>();
+  const chartData = useMemo(() => {
+    const categories = new Map<string, {
+      totalEquity: number;
+      count: number;
+      winMatrix: number[][];
+      lossMatrix: number[][];
+    }>();
 
-  for (const [handName, equity] of Object.entries(equityData)) {
-    const category = categorizeHand(handName);
-    const matrix = winMethodMatrices[handName] || Array(10).fill(null).map(() => Array(10).fill(0));
+    for (const [handName, equity] of Object.entries(equityData)) {
+      const category = categorizeHand(handName);
+      const winMatrix = winMethodMatrices[handName] || Array(10).fill(null).map(() => Array(10).fill(0));
+      const lossMatrix = lossMethodMatrices[handName] || Array(10).fill(null).map(() => Array(10).fill(0));
 
-    if (!categories.has(category)) {
-      categories.set(category, {
-        totalEquity: 0,
-        count: 0,
-        matrix: Array(10).fill(null).map(() => Array(10).fill(0)),
-      });
-    }
+      if (!categories.has(category)) {
+        categories.set(category, {
+          totalEquity: 0,
+          count: 0,
+          winMatrix: Array(10).fill(null).map(() => Array(10).fill(0)),
+          lossMatrix: Array(10).fill(null).map(() => Array(10).fill(0)),
+        });
+      }
 
-    const cat = categories.get(category)!;
-    cat.totalEquity += equity;
-    cat.count += 1;
+      const cat = categories.get(category)!;
+      cat.totalEquity += equity;
+      cat.count += 1;
 
-    // Aggregate matrices
-    for (let i = 0; i < 10; i++) {
-      for (let j = 0; j < 10; j++) {
-        cat.matrix[i][j] += matrix[i][j];
+      // Aggregate matrices
+      for (let i = 0; i < 10; i++) {
+        for (let j = 0; j < 10; j++) {
+          cat.winMatrix[i][j] += winMatrix[i][j];
+          cat.lossMatrix[i][j] += lossMatrix[i][j];
+        }
       }
     }
-  }
 
-  const chartData = Array.from(categories.entries()).map(([category, data]) => ({
-    category,
-    equity: (data.totalEquity / data.count) * 100,
-    matrix: data.matrix,
-  }));
+    return Array.from(categories.entries()).map(([category, data]) => ({
+      category,
+      equity: (data.totalEquity / data.count) * 100,
+      winMatrix: data.winMatrix,
+      lossMatrix: data.lossMatrix,
+    }));
+  }, [equityData, winMethodMatrices, lossMethodMatrices]);
 
   const handleBarHover = (data: any) => {
     if (data && data.activePayload && data.activePayload[0]) {
       const payload = data.activePayload[0].payload;
-      console.log("[EquityCategoryChart] Bar hover:", payload.category, "Matrix sum:", payload.matrix.flat().reduce((a: number, b: number) => a + b, 0));
       setHoveredCategory(payload.category);
-      setHoveredMatrix(payload.matrix);
+      setHoveredData({
+        winMatrix: payload.winMatrix,
+        lossMatrix: payload.lossMatrix
+      });
     }
   };
 
   const handleBarLeave = () => {
-    console.log("[EquityCategoryChart] Bar leave");
-    setHoveredCategory(null);
-    setHoveredMatrix(null);
+    // Optional: clear on leave, but sometimes nice to keep last hovered
+    // setHoveredCategory(null);
+    // setHoveredData(null);
   };
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Equity by Opponent Category</CardTitle>
+        <CardTitle className="flex items-center justify-between">
+          <span>Equity by Opponent Category</span>
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -162,13 +179,17 @@ export const EquityCategoryChart: React.FC<EquityCategoryChartProps> = ({
             </BarChart>
           </ResponsiveContainer>
 
-          {hoveredMatrix && hoveredCategory && (
+          {hoveredData && hoveredCategory && (
             <div key={hoveredCategory}>
-              <h3 className="text-sm font-medium mb-2">
-                Win-Method Matrix: {hoveredCategory}
+              <h3 className="text-sm font-medium mb-2 flex items-center gap-2">
+                Detailed Matchup Matrix: {hoveredCategory}
+                <span className="text-xs font-normal text-muted-foreground ml-auto">
+                  Total Outcomes: {(hoveredData.winMatrix.flat().reduce((a, b) => a + b, 0) + hoveredData.lossMatrix.flat().reduce((a, b) => a + b, 0)).toLocaleString()}
+                </span>
               </h3>
-              <WinMethodMatrixHeatmap
-                matrix={hoveredMatrix}
+              <UnifiedMatrixHeatmap
+                winMatrix={hoveredData.winMatrix}
+                lossMatrix={hoveredData.lossMatrix}
                 category={hoveredCategory}
               />
             </div>
@@ -185,78 +206,116 @@ const CustomTooltip = ({ active, payload }: any) => {
       <div className="bg-background border border-border p-2 rounded shadow-lg">
         <p className="text-sm font-medium">{payload[0].payload.category}</p>
         <p className="text-sm">Equity: {payload[0].value.toFixed(1)}%</p>
-        <p className="text-xs text-muted-foreground mt-1">Hover for win-method details</p>
+        <p className="text-xs text-muted-foreground mt-1">Hover for detailed matchup matrix</p>
       </div>
     );
   }
   return null;
 };
 
-const WinMethodMatrixHeatmap: React.FC<{
-  matrix: number[][];
+const UnifiedMatrixHeatmap: React.FC<{
+  winMatrix: number[][];
+  lossMatrix: number[][];
   category: string;
-}> = ({ matrix, category }) => {
-  console.log("[WinMethodMatrixHeatmap] Rendering for category:", category, "Total count:", matrix.flat().reduce((sum, val) => sum + val, 0));
+}> = ({ winMatrix, lossMatrix, category }) => {
+  // Calculate total outcomes for the entire matrix to normalize percentages
+  // Note: This ignores ties that are not spatially mapped in the matrix
+  // If we wanted to be perfectly accurate to "Total Simulations", we'd need that number passed down
+  // But calculating percentage of "Decisive Outcomes" (Wins+Losses) is a good proxy for visualization
+  const totalCount = winMatrix.flat().reduce((sum, val) => sum + val, 0) + 
+                     lossMatrix.flat().reduce((sum, val) => sum + val, 0);
 
-  const maxValue = Math.max(...matrix.flat());
-  const totalCount = matrix.flat().reduce((sum, val) => sum + val, 0);
+  // Determine max cell value for color intensity scaling
+  let maxCellValue = 0;
+  for (let i = 0; i < 10; i++) {
+    for (let j = 0; j < 10; j++) {
+      // winMatrix[i][j] (We Win)
+      // lossMatrix[j][i] (Opponent Wins, note index swap from parsing if needed, but in our parsing we did:
+      // matrix[opp_type][our_type] = lossMatrixFlat...
+      // So lossMatrix is currently [OpponentType][OurType]
+      // To get losses where We have i and Opp has j, we need lossMatrix[j][i]
+      
+      const wins = winMatrix[i][j];
+      const losses = lossMatrix[j][i]; 
+      const cellTotal = wins + losses;
+      if (cellTotal > maxCellValue) maxCellValue = cellTotal;
+    }
+  }
 
   return (
-    <div className="overflow-auto">
-      <table className="text-xs border-collapse">
+    <div className="overflow-auto border rounded-md p-2 bg-card">
+      <table className="text-xs border-collapse w-full">
         <thead>
           <tr>
-            <th className="border p-1"></th>
+            <th className="border p-1 bg-muted/50"></th>
             {HAND_TYPE_ABBREVIATIONS.map((abbr, idx) => (
-              <th key={idx} className="border p-1 text-center" title={HAND_TYPE_NAMES[idx]}>
+              <th key={idx} className="border p-1 text-center bg-muted/50" title={`Opponent: ${HAND_TYPE_NAMES[idx]}`}>
                 {abbr}
               </th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {matrix.map((row, ourType) => (
-            <tr key={ourType}>
-              <td className="border p-1 font-medium" title={HAND_TYPE_NAMES[ourType]}>
-                {HAND_TYPE_ABBREVIATIONS[ourType]}
+          {winMatrix.map((row, rowIdx) => (
+            <tr key={rowIdx}>
+              <td className="border p-1 font-medium bg-muted/50" title={`You: ${HAND_TYPE_NAMES[rowIdx]}`}>
+                {HAND_TYPE_ABBREVIATIONS[rowIdx]}
               </td>
-              {row.map((count, oppType) => {
-                const intensity = maxValue > 0 ? count / maxValue : 0;
-                const percentage = totalCount > 0 ? (count / totalCount) * 100 : 0;
+              {row.map((_, colIdx) => {
+                // winMatrix[row][col] -> We have row, Opp has col. We Win.
+                // lossMatrix[col][row] -> Opp has col, We have row. Opp Wins (We Lose).
+                
+                const wins = winMatrix[rowIdx][colIdx];
+                const losses = lossMatrix[colIdx][rowIdx];
+                const cellTotal = wins + losses;
+                
+                const percentage = totalCount > 0 ? (cellTotal / totalCount) * 100 : 0;
+                const winPct = cellTotal > 0 ? (wins / cellTotal) * 100 : 0;
+                const lossPct = cellTotal > 0 ? (losses / cellTotal) * 100 : 0;
 
-                // Determine cell styling based on diagonal position
-                const isAboveDiagonal = ourType < oppType; // Opponent rank is higher (losses)
-                const isOnDiagonal = ourType === oppType;  // Same rank (kicker battles)
-                const isBelowDiagonal = ourType > oppType; // Your rank is higher (clear wins)
+                const intensity = maxCellValue > 0 ? cellTotal / maxCellValue : 0;
+                const minAlpha = 0.1;
+                const alpha = minAlpha + (intensity * (1 - minAlpha));
 
-                // Apply heatmap color (green for clear wins, blue for kicker battles)
-                const bgColor = isBelowDiagonal
-                  ? `rgba(34, 197, 94, ${intensity})` // Green for clear wins
-                  : isOnDiagonal
-                    ? `rgba(59, 130, 246, ${intensity})` // Blue for kicker battles
-                    : `rgba(200, 200, 200, 0.2)`; // Light gray for empty cells (no data)
+                let bgColor;
+                
+                // Color Logic:
+                // Mostly Wins (>60%) -> Green
+                // Mostly Losses (>60%) -> Red
+                // Mixed (40-60%) -> Blue/Purple/Orange (Contested)
+                
+                if (cellTotal === 0) {
+                    bgColor = `rgba(200, 200, 200, 0.05)`; // Empty
+                } else if (winPct > 60) {
+                    // Green scaled by intensity (how often this matchup happens)
+                    bgColor = `rgba(34, 197, 94, ${alpha})`; 
+                } else if (lossPct > 60) {
+                    // Red scaled by intensity
+                    bgColor = `rgba(239, 68, 68, ${alpha})`;
+                } else {
+                    // Mixed/Contested
+                    bgColor = `rgba(59, 130, 246, ${alpha})`; // Blue
+                }
+                
+                // Special border for diagonal
+                const isDiagonal = rowIdx === colIdx;
+                const borderStyle = isDiagonal ? "2px solid #f59e0b" : undefined; // Orange border for kicker battles
 
-                // Create narrative tooltip
-                const narrative = count > 0
-                  ? `You win ${percentage.toFixed(1)}% of the time by making ${HAND_TYPE_NAMES[ourType]} against their ${HAND_TYPE_NAMES[oppType]}`
-                  : isAboveDiagonal
-                    ? `Cannot win with ${HAND_TYPE_NAMES[ourType]} against opponent's ${HAND_TYPE_NAMES[oppType]} (only tracks wins)`
-                    : "No outcomes in this category";
+                const narrative = cellTotal > 0
+                  ? `Matchup: You have ${HAND_TYPE_NAMES[rowIdx]}, Opp has ${HAND_TYPE_NAMES[colIdx]}\nFrequency: ${percentage.toFixed(1)}%\n\nOutcomes:\nWins: ${wins.toLocaleString()} (${winPct.toFixed(1)}%)\nLosses: ${losses.toLocaleString()} (${lossPct.toFixed(1)}%)`
+                  : "No outcomes";
 
                 return (
                   <td
-                    key={oppType}
-                    className={`border p-1 text-center ${
-                      isAboveDiagonal ? "opacity-60" : ""
-                    }`}
+                    key={colIdx}
+                    className="border p-1 text-center transition-colors hover:ring-2 hover:ring-primary z-10 relative cursor-help"
                     style={{
                       backgroundColor: bgColor,
-                      borderRight: oppType === ourType - 1 ? "2px solid #6b7280" : undefined,
-                      borderBottom: ourType === oppType ? "2px solid #6b7280" : undefined,
+                      border: borderStyle
                     }}
                     title={narrative}
                   >
-                    {count > 0 ? `${percentage.toFixed(1)}%` : ""}
+                    {percentage >= 1.0 ? `${percentage.toFixed(0)}%` : (percentage > 0 ? "<1%" : "")}
                   </td>
                 );
               })}
@@ -265,17 +324,15 @@ const WinMethodMatrixHeatmap: React.FC<{
         </tbody>
       </table>
       <div className="mt-2 text-xs text-muted-foreground space-y-1">
-        <p className="font-medium">Rows: Your final hand | Columns: Opponent final hand</p>
-        <p>
-          <span className="inline-block w-3 h-3 bg-green-500 mr-1"></span>
-          Clear Wins (your rank &gt; opponent) |
-          <span className="inline-block w-3 h-3 bg-blue-500 mx-1"></span>
-          Kicker Battles (same rank)
-        </p>
-        <p className="italic mt-1">
-          Note: This matrix only tracks hands where you WIN. Cells above the diagonal
-          (opponent rank &gt; yours) are empty because you cannot win with a lower-ranked hand.
-          Tracking loss details would require backend changes to capture a loss_method_matrix.
+        <p className="font-medium">Rows: Your Hand | Columns: Opponent Hand</p>
+        <div className="flex flex-wrap gap-2">
+           <span className="flex items-center"><span className="w-3 h-3 bg-green-500 mr-1 rounded-sm"></span>You Win (&gt;60%)</span>
+           <span className="flex items-center"><span className="w-3 h-3 bg-red-500 mr-1 rounded-sm"></span>Opponent Wins (&gt;60%)</span>
+           <span className="flex items-center"><span className="w-3 h-3 bg-blue-500 mr-1 rounded-sm"></span>Contested (~50/50)</span>
+           <span className="flex items-center"><span className="w-3 h-3 border-2 border-orange-500 mr-1 rounded-sm"></span>Diagonal (Kicker Battles)</span>
+        </div>
+        <p className="italic opacity-80 mt-1">
+            Percentages show frequency of this specific matchup occurring relative to all decisive outcomes in this category.
         </p>
       </div>
     </div>

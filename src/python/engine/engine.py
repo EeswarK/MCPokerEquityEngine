@@ -101,7 +101,8 @@ class EquityEngine:
     ) -> EquityResult:
         # Track equity by opponent hand type
         opponent_stats: Dict[str, Dict[str, int]] = {}  # opponent_hand -> {wins, ties, losses, total}
-        win_method_matrix = [[0] * 10 for _ in range(10)]
+        win_method_matrix = [[0] * 10 for _ in range(10)]  # [our_type][opp_type] when we win
+        loss_method_matrix = [[0] * 10 for _ in range(10)]  # [opp_type][our_type] when we lose
         update_interval = 1000  # Update shared memory every 1000 simulations
 
         for sim_num in range(num_simulations):
@@ -119,8 +120,9 @@ class EquityEngine:
                 win_method_matrix[our_type][opp_type] += 1
             elif outcome == 0:
                 stats["ties"] += 1
-            else:
+            else:  # outcome == -1 (loss)
                 stats["losses"] += 1
+                loss_method_matrix[opp_type][our_type] += 1  # Note: reversed indices
 
             # Periodically update shared memory with partial results
             if self.shm_writer and results is not None and (sim_num + 1) % update_interval == 0:
@@ -143,6 +145,7 @@ class EquityEngine:
                         losses=stats_dict["losses"],
                         total_simulations=total,
                         win_method_matrix=win_method_matrix,
+                        loss_method_matrix=loss_method_matrix,
                     )
 
                 self.shm_writer.update_equity_results(results)
@@ -161,6 +164,7 @@ class EquityEngine:
                 losses=stats_dict["losses"],
                 total_simulations=total,
                 win_method_matrix=win_method_matrix,
+                loss_method_matrix=loss_method_matrix,
             )
 
         # Debug logging
@@ -188,6 +192,7 @@ class EquityEngine:
             losses=total_losses,
             total_simulations=total_sims,
             win_method_matrix=win_method_matrix,
+            loss_method_matrix=loss_method_matrix,
         )
 
     def get_mode(self) -> str:

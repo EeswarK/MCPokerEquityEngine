@@ -65,11 +65,20 @@ int main(int argc, char* argv[]) {
                 std::vector<flatbuffers::Offset<Telemetry::HandEquity>> equity_results_vec;
                 for (uint32_t i = 0; i < equity_snapshot.results_count && i < MAX_HANDS; i++) {
                     // Flatten win-method matrix (10x10 -> 100 element vector)
-                    std::vector<uint32_t> matrix_flat;
-                    matrix_flat.reserve(100);
+                    std::vector<uint32_t> win_matrix_flat;
+                    win_matrix_flat.reserve(100);
                     for (int our_type = 0; our_type < 10; our_type++) {
                         for (int opp_type = 0; opp_type < 10; opp_type++) {
-                            matrix_flat.push_back(equity_snapshot.results[i].win_method_matrix[our_type][opp_type]);
+                            win_matrix_flat.push_back(equity_snapshot.results[i].win_method_matrix[our_type][opp_type]);
+                        }
+                    }
+
+                    // Flatten loss-method matrix (10x10 -> 100 element vector)
+                    std::vector<uint32_t> loss_matrix_flat;
+                    loss_matrix_flat.reserve(100);
+                    for (int opp_type = 0; opp_type < 10; opp_type++) {
+                        for (int our_type = 0; our_type < 10; our_type++) {
+                            loss_matrix_flat.push_back(equity_snapshot.results[i].loss_method_matrix[opp_type][our_type]);
                         }
                     }
 
@@ -81,7 +90,8 @@ int main(int argc, char* argv[]) {
                         equity_snapshot.results[i].ties,
                         equity_snapshot.results[i].losses,
                         equity_snapshot.results[i].simulations,
-                        &matrix_flat
+                        &win_matrix_flat,
+                        &loss_matrix_flat
                     );
                     equity_results_vec.push_back(hand_equity);
                 }

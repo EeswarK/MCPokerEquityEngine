@@ -17,7 +17,8 @@ class HandEquityResult(Structure):
         ("losses", c_uint32),                    # 4 bytes
         ("simulations", c_uint32),               # 4 bytes
         ("win_method_matrix", (c_uint32 * 10) * 10),  # 400 bytes (10x10 matrix)
-        ("_padding", c_uint32 * 6),              # 24 bytes (total 448 bytes)
+        ("loss_method_matrix", (c_uint32 * 10) * 10),  # 400 bytes (10x10 matrix)
+        ("_padding", c_uint32 * 2),              # 8 bytes (total 832 bytes)
     ]
 
 
@@ -145,6 +146,13 @@ class SharedMemoryWriter:
                     for opp_type in range(10):
                         self.data.equity_results.results[idx].win_method_matrix[our_type][opp_type] = \
                             result.win_method_matrix[our_type][opp_type]
+
+            # Write loss-method matrix
+            if result.loss_method_matrix is not None:
+                for opp_type in range(10):
+                    for our_type in range(10):
+                        self.data.equity_results.results[idx].loss_method_matrix[opp_type][our_type] = \
+                            result.loss_method_matrix[opp_type][our_type]
 
         self.data.equity_results.seq += 1
 

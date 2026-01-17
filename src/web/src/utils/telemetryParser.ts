@@ -76,6 +76,7 @@ export function parseTelemetryPacket(
     const currentResults: Record<string, number> = {};
     const sampleCounts: Record<string, number> = {};
     const winMethodMatrices: Record<string, number[][]> = {};
+    const lossMethodMatrices: Record<string, number[][]> = {};
     const equityResultsLength = packet.equityResultsLength();
 
     for (let i = 0; i < equityResultsLength; i++) {
@@ -100,6 +101,24 @@ export function parseTelemetryPacket(
                 }
               }
               winMethodMatrices[normalizedHandName] = matrix;
+            }
+          }
+
+          // Parse loss-method matrix (flattened 100-element array)
+          if (typeof handEquity.lossMethodMatrixArray === 'function') {
+            const lossMatrixFlat = handEquity.lossMethodMatrixArray();
+            if (lossMatrixFlat && lossMatrixFlat.length === 100) {
+              const matrix: number[][] = [];
+              for (let opp_type = 0; opp_type < 10; opp_type++) {
+                matrix[opp_type] = [];
+                for (let our_type = 0; our_type < 10; our_type++) {
+                  // Note: Indices might need swapping depending on how backend flattened it
+                  // Assuming row=opponent, col=us based on Plan
+                  // Plan says: matrix[opp_type][our_type] = lossMatrixFlat[opp_type * 10 + our_type];
+                  matrix[opp_type][our_type] = lossMatrixFlat[opp_type * 10 + our_type];
+                }
+              }
+              lossMethodMatrices[normalizedHandName] = matrix;
             }
           }
         }
@@ -141,6 +160,7 @@ export function parseTelemetryPacket(
       current_results: currentResults,
       sample_counts: sampleCounts,
       win_method_matrices: winMethodMatrices,
+      loss_method_matrices: lossMethodMatrices,
       metrics,
       timestamp: new Date(
         Number(data.timestamp_ns / BigInt(1e6))
