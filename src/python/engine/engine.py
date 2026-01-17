@@ -100,9 +100,8 @@ class EquityEngine:
         results: Optional[Dict[str, EquityResult]] = None,
     ) -> EquityResult:
         # Track equity by opponent hand type
-        opponent_stats: Dict[str, Dict[str, int]] = {}  # opponent_hand -> {wins, ties, losses, total}
-        win_method_matrix = [[0] * 10 for _ in range(10)]  # [our_type][opp_type] when we win
-        loss_method_matrix = [[0] * 10 for _ in range(10)]  # [opp_type][our_type] when we lose
+        # opponent_hand -> {wins, ties, losses, total, win_matrix, loss_matrix}
+        opponent_stats: Dict[str, Dict[str, Any]] = {} 
         update_interval = 1000  # Update shared memory every 1000 simulations
 
         for sim_num in range(num_simulations):
@@ -110,19 +109,26 @@ class EquityEngine:
 
             # Initialize stats for this opponent hand type if not seen before
             if opp_hand_classification not in opponent_stats:
-                opponent_stats[opp_hand_classification] = {"wins": 0, "ties": 0, "losses": 0, "total": 0}
+                opponent_stats[opp_hand_classification] = {
+                    "wins": 0, 
+                    "ties": 0, 
+                    "losses": 0, 
+                    "total": 0,
+                    "win_matrix": [[0] * 10 for _ in range(10)],
+                    "loss_matrix": [[0] * 10 for _ in range(10)]
+                }
 
             stats = opponent_stats[opp_hand_classification]
             stats["total"] += 1
 
             if outcome == 1:
                 stats["wins"] += 1
-                win_method_matrix[our_type][opp_type] += 1
+                stats["win_matrix"][our_type][opp_type] += 1
             elif outcome == 0:
                 stats["ties"] += 1
             else:  # outcome == -1 (loss)
                 stats["losses"] += 1
-                loss_method_matrix[opp_type][our_type] += 1  # Note: reversed indices
+                stats["loss_matrix"][opp_type][our_type] += 1  # Note: reversed indices
 
             # Periodically update shared memory with partial results
             if self.shm_writer and results is not None and (sim_num + 1) % update_interval == 0:
@@ -144,8 +150,8 @@ class EquityEngine:
                         ties=stats_dict["ties"],
                         losses=stats_dict["losses"],
                         total_simulations=total,
-                        win_method_matrix=win_method_matrix,
-                        loss_method_matrix=loss_method_matrix,
+                        win_method_matrix=stats_dict["win_matrix"],
+                        loss_method_matrix=stats_dict["loss_matrix"],
                     )
 
                 self.shm_writer.update_equity_results(results)
@@ -163,8 +169,8 @@ class EquityEngine:
                 ties=stats_dict["ties"],
                 losses=stats_dict["losses"],
                 total_simulations=total,
-                win_method_matrix=win_method_matrix,
-                loss_method_matrix=loss_method_matrix,
+                win_method_matrix=stats_dict["win_matrix"],
+                loss_method_matrix=stats_dict["loss_matrix"],
             )
 
         # Debug logging
@@ -182,6 +188,17 @@ class EquityEngine:
         total_wins = sum(stats["wins"] for stats in opponent_stats.values())
         total_ties = sum(stats["ties"] for stats in opponent_stats.values())
         total_losses = sum(stats["losses"] for stats in opponent_stats.values())
+        
+        # Aggregate matrices for overall summary
+        overall_win_matrix = [[0] * 10 for _ in range(10)]
+        overall_loss_matrix = [[0] * 10 for _ in range(10)]
+        
+        for stats in opponent_stats.values():
+            for i in range(10):
+                for j in range(10):
+                    overall_win_matrix[i][j] += stats["win_matrix"][i][j]
+                    overall_loss_matrix[i][j] += stats["loss_matrix"][i][j]
+
         overall_equity = (total_wins + total_ties * 0.5) / total_sims if total_sims > 0 else 0.0
 
         return EquityResult(
@@ -191,8 +208,8 @@ class EquityEngine:
             ties=total_ties,
             losses=total_losses,
             total_simulations=total_sims,
-            win_method_matrix=win_method_matrix,
-            loss_method_matrix=loss_method_matrix,
+            win_method_matrix=overall_win_matrix,
+            loss_method_matrix=overall_loss_matrix,
         )
 
     def get_mode(self) -> str:

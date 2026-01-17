@@ -84,7 +84,6 @@ export const EquityCategoryChart: React.FC<EquityCategoryChartProps> = ({
   lossMethodMatrices,
 }) => {
   const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
-  const [hoveredData, setHoveredData] = useState<{winMatrix: number[][], lossMatrix: number[][]}>();
 
   // Aggregate equity by category
   const chartData = useMemo(() => {
@@ -134,18 +133,19 @@ export const EquityCategoryChart: React.FC<EquityCategoryChartProps> = ({
     if (data && data.activePayload && data.activePayload[0]) {
       const payload = data.activePayload[0].payload;
       setHoveredCategory(payload.category);
-      setHoveredData({
-        winMatrix: payload.winMatrix,
-        lossMatrix: payload.lossMatrix
-      });
     }
   };
 
   const handleBarLeave = () => {
     // Optional: clear on leave, but sometimes nice to keep last hovered
     // setHoveredCategory(null);
-    // setHoveredData(null);
   };
+
+  // Derive active data directly from chartData and hoveredCategory (no extra state/effect)
+  const activeData = useMemo(() => {
+    if (!hoveredCategory) return null;
+    return chartData.find(d => d.category === hoveredCategory) || null;
+  }, [hoveredCategory, chartData]);
 
   return (
     <Card>
@@ -179,18 +179,18 @@ export const EquityCategoryChart: React.FC<EquityCategoryChartProps> = ({
             </BarChart>
           </ResponsiveContainer>
 
-          {hoveredData && hoveredCategory && (
-            <div key={hoveredCategory}>
+          {activeData && (
+            <div key={activeData.category}>
               <h3 className="text-sm font-medium mb-2 flex items-center gap-2">
-                Detailed Matchup Matrix: {hoveredCategory}
+                Detailed Matchup Matrix: {activeData.category}
                 <span className="text-xs font-normal text-muted-foreground ml-auto">
-                  Total Outcomes: {(hoveredData.winMatrix.flat().reduce((a, b) => a + b, 0) + hoveredData.lossMatrix.flat().reduce((a, b) => a + b, 0)).toLocaleString()}
+                  Total Outcomes: {(activeData.winMatrix.flat().reduce((a, b) => a + b, 0) + activeData.lossMatrix.flat().reduce((a, b) => a + b, 0)).toLocaleString()}
                 </span>
               </h3>
               <UnifiedMatrixHeatmap
-                winMatrix={hoveredData.winMatrix}
-                lossMatrix={hoveredData.lossMatrix}
-                category={hoveredCategory}
+                winMatrix={activeData.winMatrix}
+                lossMatrix={activeData.lossMatrix}
+                category={activeData.category}
               />
             </div>
           )}
