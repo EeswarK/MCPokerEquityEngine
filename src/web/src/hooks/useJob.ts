@@ -9,7 +9,11 @@ export function useJob() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { data: telemetry, connected, telemetryConnected } = useWebSocket(jobId, telemetryWsUrl);
+  const {
+    data: telemetry,
+    connected,
+    telemetryConnected,
+  } = useWebSocket(jobId, telemetryWsUrl);
 
   const submitJob = useCallback(async (request: CreateJobRequest) => {
     setLoading(true);

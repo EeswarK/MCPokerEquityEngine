@@ -1,7 +1,7 @@
-from pydantic import BaseModel, Field, field_validator
-from typing import Dict, List, Optional
 from enum import Enum
-from datetime import datetime
+from typing import Dict, List, Optional
+
+from pydantic import BaseModel, Field, field_validator
 
 from ..models.card import Card
 from ..models.job import JobRequest as InternalJobRequest
@@ -9,6 +9,7 @@ from ..models.job import JobRequest as InternalJobRequest
 
 class EngineMode(str, Enum):
     BASE_PYTHON = "base_python"
+    SENZEE = "senzee"
     NUMPY = "numpy"
     MULTIPROCESSING = "multiprocessing"
 
@@ -23,7 +24,7 @@ class CreateJobRequest(BaseModel):
     board: List[CardModel] = Field(default_factory=list)
     num_opponents: int = Field(ge=1, le=9, default=1)
     num_simulations: int = Field(ge=1000, le=10000000, default=100000)
-    mode: EngineMode = EngineMode.BASE_PYTHON
+    mode: EngineMode = EngineMode.SENZEE
     num_workers: Optional[int] = Field(None, gt=0)
 
     @field_validator("board")

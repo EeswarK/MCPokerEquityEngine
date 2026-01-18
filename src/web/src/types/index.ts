@@ -1,5 +1,6 @@
 export type EngineMode =
   | "base_python"
+  | "senzee"
   | "numpy"
   | "multiprocessing"
   | "cpp_base"

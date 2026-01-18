@@ -56,20 +56,21 @@ class EquityEngine:
                     request.board,
                     request.num_opponents,
                     simulations_per_hand,
+                    hand_name,
+                    results,
                 )
-                equity_result.hand_name = hand_name
-                results[hand_name] = equity_result
-                self.simulations_processed += simulations_per_hand
+                # Store overall equity result (for API response) but don't add to results dict
+                # because results dict now contains opponent-specific equity data
+                # results[hand_name] = equity_result  # REMOVED - would overwrite opponent data
+                # Note: simulations_processed is now updated inside _calculate_hand_equity
 
+                # Final update for this hand with complete results
                 if self.shm_writer:
-                    if (
-                        self.simulations_processed - self.last_update_count
-                    ) >= self.update_frequency:
-                        self.shm_writer.update_hands(self.simulations_processed)
-                        self.last_update_count = self.simulations_processed
-
-                # Update equity results in shared memory
-                if self.shm_writer:
+                    # Ensure hands_processed reflects the total for this hand
+                    expected_total = (idx + 1) * simulations_per_hand
+                    if self.simulations_processed < expected_total:
+                        self.simulations_processed = expected_total
+                    self.shm_writer.update_hands(self.simulations_processed)
                     self.shm_writer.update_equity_results(results)
 
                 progress = (idx + 1) / total_hands
@@ -95,30 +96,120 @@ class EquityEngine:
         board: list[Card],
         num_opponents: int,
         num_simulations: int,
+        hand_name: str = "",
+        results: Optional[Dict[str, EquityResult]] = None,
     ) -> EquityResult:
-        wins = 0
-        ties = 0
-        losses = 0
+        # Track equity by opponent hand type
+        # opponent_hand -> {wins, ties, losses, total, win_matrix, loss_matrix}
+        opponent_stats: Dict[str, Dict[str, Any]] = {} 
+        update_interval = 1000  # Update shared memory every 1000 simulations
 
-        for _ in range(num_simulations):
-            outcome = self.simulate_hand(hole_cards, board, num_opponents)
+        for sim_num in range(num_simulations):
+            outcome, our_type, opp_type, opp_hand_classification = self.simulate_hand(hole_cards, board, num_opponents)
+
+            # Initialize stats for this opponent hand type if not seen before
+            if opp_hand_classification not in opponent_stats:
+                opponent_stats[opp_hand_classification] = {
+                    "wins": 0, 
+                    "ties": 0, 
+                    "losses": 0, 
+                    "total": 0,
+                    "win_matrix": [[0] * 10 for _ in range(10)],
+                    "loss_matrix": [[0] * 10 for _ in range(10)]
+                }
+
+            stats = opponent_stats[opp_hand_classification]
+            stats["total"] += 1
+
             if outcome == 1:
-                wins += 1
+                stats["wins"] += 1
+                stats["win_matrix"][our_type][opp_type] += 1
             elif outcome == 0:
-                ties += 1
-            else:
-                losses += 1
+                stats["ties"] += 1
+            else:  # outcome == -1 (loss)
+                stats["losses"] += 1
+                stats["loss_matrix"][opp_type][our_type] += 1  # Note: reversed indices
 
-        total = wins + ties + losses
-        equity = (wins + ties * 0.5) / total if total > 0 else 0.0
+            # Periodically update shared memory with partial results
+            if self.shm_writer and results is not None and (sim_num + 1) % update_interval == 0:
+                # Update hands processed counter
+                self.simulations_processed += update_interval
+                if (self.simulations_processed - self.last_update_count) >= self.update_frequency:
+                    self.shm_writer.update_hands(self.simulations_processed)
+                    self.last_update_count = self.simulations_processed
+
+                # Create EquityResult for each opponent hand type
+                for opp_hand, stats_dict in opponent_stats.items():
+                    total = stats_dict["total"]
+                    equity = (stats_dict["wins"] + stats_dict["ties"] * 0.5) / total if total > 0 else 0.0
+
+                    results[opp_hand] = EquityResult(
+                        hand_name=opp_hand,
+                        equity=equity,
+                        wins=stats_dict["wins"],
+                        ties=stats_dict["ties"],
+                        losses=stats_dict["losses"],
+                        total_simulations=total,
+                        win_method_matrix=stats_dict["win_matrix"],
+                        loss_method_matrix=stats_dict["loss_matrix"],
+                    )
+
+                self.shm_writer.update_equity_results(results)
+
+        # Create final EquityResults for each opponent hand type
+        final_results = {}
+        for opp_hand, stats_dict in opponent_stats.items():
+            total = stats_dict["total"]
+            equity = (stats_dict["wins"] + stats_dict["ties"] * 0.5) / total if total > 0 else 0.0
+
+            final_results[opp_hand] = EquityResult(
+                hand_name=opp_hand,
+                equity=equity,
+                wins=stats_dict["wins"],
+                ties=stats_dict["ties"],
+                losses=stats_dict["losses"],
+                total_simulations=total,
+                win_method_matrix=stats_dict["win_matrix"],
+                loss_method_matrix=stats_dict["loss_matrix"],
+            )
+
+        # Debug logging
+        import logging
+        logging.info(f"[ENGINE] Opponent stats collected: {len(opponent_stats)} unique hands")
+        logging.info(f"[ENGINE] Sample opponent hands: {list(opponent_stats.keys())[:20]}")
+
+        # Update results dict with all opponent-specific equities
+        if results is not None:
+            results.update(final_results)
+            logging.info(f"[ENGINE] Results dict now has {len(results)} entries")
+
+        # Return overall equity as a summary (for backward compatibility)
+        total_sims = sum(stats["total"] for stats in opponent_stats.values())
+        total_wins = sum(stats["wins"] for stats in opponent_stats.values())
+        total_ties = sum(stats["ties"] for stats in opponent_stats.values())
+        total_losses = sum(stats["losses"] for stats in opponent_stats.values())
+        
+        # Aggregate matrices for overall summary
+        overall_win_matrix = [[0] * 10 for _ in range(10)]
+        overall_loss_matrix = [[0] * 10 for _ in range(10)]
+        
+        for stats in opponent_stats.values():
+            for i in range(10):
+                for j in range(10):
+                    overall_win_matrix[i][j] += stats["win_matrix"][i][j]
+                    overall_loss_matrix[i][j] += stats["loss_matrix"][i][j]
+
+        overall_equity = (total_wins + total_ties * 0.5) / total_sims if total_sims > 0 else 0.0
 
         return EquityResult(
-            hand_name="",
-            equity=equity,
-            wins=wins,
-            ties=ties,
-            losses=losses,
-            total_simulations=num_simulations,
+            hand_name=hand_name,
+            equity=overall_equity,
+            wins=total_wins,
+            ties=total_ties,
+            losses=total_losses,
+            total_simulations=total_sims,
+            win_method_matrix=overall_win_matrix,
+            loss_method_matrix=overall_loss_matrix,
         )
 
     def get_mode(self) -> str:

@@ -2,6 +2,12 @@ import { EngineMode } from "../types";
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
 import { Label } from "./ui/label";
 import { Input } from "./ui/input";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "./ui/tooltip";
 
 interface ModeSelectorProps {
   mode: EngineMode;
@@ -18,11 +24,25 @@ export const ModeSelector: React.FC<ModeSelectorProps> = ({
   onWorkersChange,
   disabled = false,
 }) => {
-  const pythonModes: EngineMode[] = ["base_python", "numpy", "multiprocessing"];
+  const pythonModes: EngineMode[] = ["base_python", "senzee", "numpy", "multiprocessing"];
   const cppModes: EngineMode[] = ["cpp_base", "cpp_simd", "cpp_threaded"];
 
   const formatModeName = (m: string): string => {
+    // Special cases for display names
+    if (m === "base_python") return "Naive";
+    if (m === "senzee") return "Cactus Kev's";
+    if (m === "numpy") return "Numpy";
+    if (m === "multiprocessing") return "Multiprocessing";
+
+    // Fallback to title case
     return m.replace("_", " ").replace(/\b\w/g, (l) => l.toUpperCase());
+  };
+
+  const getModeTooltip = (m: string): string | null => {
+    if (m === "senzee") {
+      return "Fast evaluation using bitwise operations and perfect hash lookup table (Paul Senzee)";
+    }
+    return null;
   };
 
   return (
@@ -33,14 +53,32 @@ export const ModeSelector: React.FC<ModeSelectorProps> = ({
         <div className="mode-group space-y-3">
           <h3 className="text-sm font-semibold">Python Modes</h3>
           <RadioGroup value={mode} onValueChange={(value) => onChange(value as EngineMode)}>
-            {pythonModes.map((m) => (
-              <div key={m} className="flex items-center space-x-2">
-                <RadioGroupItem value={m} id={m} disabled={disabled} />
-                <Label htmlFor={m} className="cursor-pointer">
-                  {formatModeName(m)}
-                </Label>
-              </div>
-            ))}
+            {pythonModes.map((m) => {
+              const tooltip = getModeTooltip(m);
+              const radioButton = (
+                <div key={m} className="flex items-center space-x-2">
+                  <RadioGroupItem value={m} id={m} disabled={disabled} />
+                  <Label htmlFor={m} className="cursor-pointer">
+                    {formatModeName(m)}
+                  </Label>
+                </div>
+              );
+
+              if (tooltip) {
+                return (
+                  <TooltipProvider key={m}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>{radioButton}</TooltipTrigger>
+                      <TooltipContent>
+                        <p className="max-w-xs">{tooltip}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                );
+              }
+
+              return radioButton;
+            })}
           </RadioGroup>
         </div>
 

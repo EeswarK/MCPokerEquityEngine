@@ -16,10 +16,12 @@ struct HandEquityResult {
     uint32_t ties;        // Number of ties
     uint32_t losses;      // Number of losses
     uint32_t simulations; // Total simulations for this hand
-    uint32_t _padding;    // Align to 32 bytes
+    uint32_t win_method_matrix[10][10];   // Win frequency by hand type: [our_type][opp_type]
+    uint32_t loss_method_matrix[10][10];  // Loss frequency by hand type: [opp_type][our_type]
+    uint32_t _padding[2]; // Padding to make total 832 bytes (8 + 4 + 4 + 4 + 4 + 400 + 400 + 8 = 832)
 };
 
-static_assert(sizeof(HandEquityResult) == 32, "HandEquityResult must be 32 bytes");
+static_assert(sizeof(HandEquityResult) == 832, "HandEquityResult must be 832 bytes");
 
 // Equity results segment (follows telemetry struct in shared memory)
 struct EquityResultsSegment {
@@ -39,6 +41,9 @@ struct alignas(64) TelemetrySharedMemory {
 
     uint32_t _padding1;  // Align next field to 8-byte boundary
 
+    // Job start timestamp (nanoseconds since epoch)
+    uint64_t job_start_ns;
+
     // Atomic counter for hands processed (updated by evaluator)
     uint64_t hands_processed;
 
@@ -49,7 +54,7 @@ struct alignas(64) TelemetrySharedMemory {
     uint8_t status;
 
     // Reserved for future use (padding to cache line size)
-    uint8_t _reserved[39];
+    uint8_t _reserved[31];
 };
 
 // Size must be exactly one cache line (64 bytes) for cache coherency
@@ -63,6 +68,7 @@ struct CompleteSharedMemory {
 };
 
 struct TelemetrySnapshot {
+    uint64_t job_start_ns;
     uint64_t hands_processed;
     uint64_t last_update_ns;
     uint8_t status;

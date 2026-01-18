@@ -1,7 +1,8 @@
 from typing import Optional
 
 from .engine import EquityEngine
-from .strategies.base import evaluate_hand_base, simulate_hand_base
+from .strategies.naive import evaluate_hand_naive, simulate_hand_naive
+from .strategies.senzee import evaluate_hand_senzee, simulate_hand_senzee
 
 
 def create_engine(
@@ -9,9 +10,18 @@ def create_engine(
 ) -> EquityEngine:
     if mode == "base_python":
         return EquityEngine(
-            evaluate_hand=evaluate_hand_base,
-            simulate_hand=simulate_hand_base,
+            evaluate_hand=evaluate_hand_naive,
+            simulate_hand=simulate_hand_naive,
             mode="base_python",
+            num_workers=num_workers,
+            job_id=job_id,
+        )
+    elif mode == "senzee":
+        # Fast bitwise evaluator
+        return EquityEngine(
+            evaluate_hand=evaluate_hand_senzee,
+            simulate_hand=simulate_hand_senzee,
+            mode="senzee",
             num_workers=num_workers,
             job_id=job_id,
         )

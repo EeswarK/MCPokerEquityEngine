@@ -7,10 +7,13 @@ table HandEquity {
   ties:uint;
   losses:uint;
   simulations:uint;
+  win_method_matrix:[uint];   // Flattened 10x10 matrix (100 elements): [our_type * 10 + opp_type]
+  loss_method_matrix:[uint];  // Flattened 10x10 matrix (100 elements): [opp_type * 10 + our_type]
 }
 
 table TelemetryPacket {
   timestamp_ns:ulong;
+  job_start_ns:ulong;
   hands_processed:ulong;
   cpu_percent:double;
   memory_rss_kb:ulong;

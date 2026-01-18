@@ -53,6 +53,7 @@ TelemetrySnapshot SharedMemoryReader::read_telemetry_consistent() const {
             continue;
         }
 
+        snapshot.job_start_ns = data->telemetry.job_start_ns;
         snapshot.hands_processed = data->telemetry.hands_processed;
         snapshot.last_update_ns = data->telemetry.last_update_ns;
         snapshot.status = data->telemetry.status;

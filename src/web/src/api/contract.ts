@@ -51,6 +51,9 @@ export interface TelemetryUpdate {
   status: JobStatus;
   progress: number; // 0.0 to 1.0
   current_results: Record<string, number>; // hand_name -> equity
+  sample_counts: Record<string, number>; // hand_name -> simulation count
+  win_method_matrices: Record<string, number[][]>; // hand_name -> 10x10 matrix [our_type][opp_type]
+  loss_method_matrices: Record<string, number[][]>; // hand_name -> 10x10 matrix [opp_type][our_type]
   metrics: PerformanceMetrics;
   timestamp: string; // ISO 8601
 }
