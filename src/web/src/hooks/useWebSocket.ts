@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { TelemetryUpdate, WebSocketMessage } from "../api/contract";
-import { apiClient } from "../api/client";
+import { TelemetryUpdate } from "../api/contract";
 import {
   parseTelemetryPacket,
   extractPacketData,
@@ -12,65 +11,10 @@ export function useWebSocket(
 ) {
   const [data, setData] = useState<TelemetryUpdate | null>(null);
   const [connected, setConnected] = useState(false);
-  const [telemetryConnected, setTelemetryConnected] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const wsRef = useRef<WebSocket | null>(null);
   const telemetryWsRef = useRef<WebSocket | null>(null);
-  const reconnectTimeoutRef = useRef<number | null>(null);
   const telemetryReconnectTimeoutRef = useRef<number | null>(null);
   const previousHandsProcessedRef = useRef<bigint>(BigInt(0));
   const previousTimestampNsRef = useRef<bigint>(BigInt(0));
-
-  const connect = useCallback(() => {
-    if (!jobId) return;
-
-    try {
-      const ws = apiClient.createWebSocket(jobId);
-      wsRef.current = ws;
-
-      ws.onopen = () => {
-        setConnected(true);
-        setError(null);
-        if (reconnectTimeoutRef.current) {
-          clearTimeout(reconnectTimeoutRef.current);
-          reconnectTimeoutRef.current = null;
-        }
-      };
-
-      ws.onmessage = (event) => {
-        try {
-          const message: WebSocketMessage = JSON.parse(event.data);
-          if (message.type === "telemetry") {
-            // Python WebSocket no longer sends telemetry - all telemetry comes from C++
-            // This handler kept for backward compatibility but should not receive telemetry messages
-            console.warn("Received telemetry from Python WebSocket - this should not happen");
-          } else if (message.type === "error") {
-            setError(message.data.error);
-          }
-        } catch (err) {
-          console.error("Failed to parse WebSocket message:", err);
-        }
-      };
-
-      ws.onerror = (err) => {
-        console.error("WebSocket error:", err);
-        setError("WebSocket connection error");
-        setConnected(false);
-      };
-
-      ws.onclose = () => {
-        setConnected(false);
-        if (jobId) {
-          reconnectTimeoutRef.current = window.setTimeout(() => {
-            connect();
-          }, 2000);
-        }
-      };
-    } catch (err) {
-      console.error("Failed to create WebSocket:", err);
-      setError("Failed to create WebSocket connection");
-    }
-  }, [jobId]);
 
   const connectTelemetry = useCallback(() => {
     if (!telemetryWsUrl) return;
@@ -80,7 +24,7 @@ export function useWebSocket(
       telemetryWsRef.current = ws;
 
       ws.onopen = () => {
-        setTelemetryConnected(true);
+        setConnected(true);
         previousHandsProcessedRef.current = BigInt(0);
         previousTimestampNsRef.current = BigInt(0);
         if (telemetryReconnectTimeoutRef.current) {
@@ -139,11 +83,11 @@ export function useWebSocket(
 
       ws.onerror = (err) => {
         console.warn("Telemetry WebSocket error (non-fatal):", err);
-        setTelemetryConnected(false);
+        setConnected(false);
       };
 
       ws.onclose = () => {
-        setTelemetryConnected(false);
+        setConnected(false);
         if (telemetryWsUrl) {
           telemetryReconnectTimeoutRef.current = window.setTimeout(() => {
             connectTelemetry();
@@ -156,25 +100,18 @@ export function useWebSocket(
   }, [telemetryWsUrl]);
 
   useEffect(() => {
-    connect();
     if (telemetryWsUrl) {
       connectTelemetry();
     }
     return () => {
-      if (wsRef.current) {
-        wsRef.current.close();
-      }
       if (telemetryWsRef.current) {
         telemetryWsRef.current.close();
-      }
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
       }
       if (telemetryReconnectTimeoutRef.current) {
         clearTimeout(telemetryReconnectTimeoutRef.current);
       }
     };
-  }, [connect, connectTelemetry]);
+  }, [connectTelemetry]);
 
-  return { data, connected, telemetryConnected, error };
+  return { data, connected };
 }

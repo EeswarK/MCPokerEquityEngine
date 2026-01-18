@@ -27,7 +27,6 @@ function App() {
     error,
     telemetry,
     connected,
-    telemetryConnected,
   } = useJob();
 
   // Classify user's cards into standard notation (AA, AKs, AKo, etc.)
@@ -222,17 +221,12 @@ function App() {
 
             {connected && (
               <div className="text-sm text-green-600 dark:text-green-400">
-                Connected (Job Management)
+                Connected
               </div>
             )}
-            {telemetryConnected && (
-              <div className="text-sm text-green-600 dark:text-green-400">
-                Connected (Telemetry)
-              </div>
-            )}
-            {!telemetryConnected && jobId && (
+            {!connected && jobId && (
               <div className="text-sm text-yellow-600 dark:text-yellow-400">
-                Telemetry connection pending...
+                Connection pending...
               </div>
             )}
           </CardContent>

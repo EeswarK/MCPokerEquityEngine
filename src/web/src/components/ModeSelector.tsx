@@ -25,7 +25,7 @@ export const ModeSelector: React.FC<ModeSelectorProps> = ({
   disabled = false,
 }) => {
   const pythonModes: EngineMode[] = ["base_python", "senzee", "numpy", "multiprocessing"];
-  const cppModes: EngineMode[] = ["cpp_base", "cpp_simd", "cpp_threaded"];
+  const cppModes: EngineMode[] = ["cpp_naive", "cpp_base", "cpp_simd", "cpp_threaded"];
 
   const formatModeName = (m: string): string => {
     // Special cases for display names
@@ -33,14 +33,18 @@ export const ModeSelector: React.FC<ModeSelectorProps> = ({
     if (m === "senzee") return "Cactus Kev's";
     if (m === "numpy") return "Numpy";
     if (m === "multiprocessing") return "Multiprocessing";
+    if (m === "cpp_naive") return "C++ Naive";
 
     // Fallback to title case
-    return m.replace("_", " ").replace(/\b\w/g, (l) => l.toUpperCase());
+    return m.replace("cpp_", "").replace("_", " ").replace(/\b\w/g, (l) => l.toUpperCase());
   };
 
   const getModeTooltip = (m: string): string | null => {
     if (m === "senzee") {
       return "Fast evaluation using bitwise operations and perfect hash lookup table (Paul Senzee)";
+    }
+    if (m === "cpp_naive") {
+      return "C++ port of the naive brute-force evaluator";
     }
     return null;
   };
@@ -83,16 +87,39 @@ export const ModeSelector: React.FC<ModeSelectorProps> = ({
         </div>
 
         <div className="mode-group space-y-3">
-          <h3 className="text-sm font-semibold">C++ Modes (Future)</h3>
+          <h3 className="text-sm font-semibold">C++ Modes</h3>
           <RadioGroup value={mode} onValueChange={(value) => onChange(value as EngineMode)}>
-            {cppModes.map((m) => (
-              <div key={m} className="flex items-center space-x-2">
-                <RadioGroupItem value={m} id={m} disabled />
-                <Label htmlFor={m} className="cursor-not-allowed opacity-50">
-                  {formatModeName(m.replace("cpp_", ""))}
-                </Label>
-              </div>
-            ))}
+            {cppModes.map((m) => {
+              const isFuture = m !== "cpp_naive";
+              const tooltip = getModeTooltip(m);
+              
+              const radioButton = (
+                <div key={m} className="flex items-center space-x-2">
+                  <RadioGroupItem value={m} id={m} disabled={disabled || isFuture} />
+                  <Label 
+                    htmlFor={m} 
+                    className={isFuture ? "cursor-not-allowed opacity-50" : "cursor-pointer"}
+                  >
+                    {formatModeName(m)}
+                  </Label>
+                </div>
+              );
+
+              if (tooltip) {
+                return (
+                  <TooltipProvider key={m}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>{radioButton}</TooltipTrigger>
+                      <TooltipContent>
+                        <p className="max-w-xs">{tooltip}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                );
+              }
+
+              return radioButton;
+            })}
           </RadioGroup>
         </div>
 

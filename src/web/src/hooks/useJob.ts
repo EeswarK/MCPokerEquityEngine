@@ -12,7 +12,6 @@ export function useJob() {
   const {
     data: telemetry,
     connected,
-    telemetryConnected,
   } = useWebSocket(jobId, telemetryWsUrl);
 
   const submitJob = useCallback(async (request: CreateJobRequest) => {
@@ -48,6 +47,5 @@ export function useJob() {
     error,
     telemetry,
     connected,
-    telemetryConnected,
   };
 }

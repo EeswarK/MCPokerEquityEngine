@@ -3,6 +3,7 @@ export type EngineMode =
   | "senzee"
   | "numpy"
   | "multiprocessing"
+  | "cpp_naive"
   | "cpp_base"
   | "cpp_simd"
   | "cpp_threaded";

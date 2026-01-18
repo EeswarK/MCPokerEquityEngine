@@ -4,7 +4,7 @@ import logging
 import os
 import uuid
 
-from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect, status
+from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -16,7 +16,6 @@ from .models import (
     JobStatusResponse,
     create_job_request_to_internal,
 )
-from .websocket import ConnectionManager
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -53,12 +52,6 @@ app.add_middleware(
 app.add_middleware(RequestLoggingMiddleware)
 
 job_manager = JobManager()
-connection_manager = ConnectionManager()
-
-
-@app.on_event("startup")
-async def startup_event():
-    await connection_manager.start_worker()
 
 
 @app.post("/api/jobs", response_model=CreateJobResponse, status_code=status.HTTP_201_CREATED)
@@ -77,7 +70,7 @@ async def create_job(request: CreateJobRequest):
         telemetry_port = int(os.getenv("TELEMETRY_PORT", "8001"))
         telemetry_ws_url = f"{protocol}://{host}:{telemetry_port}/telemetry/{job_id}"
 
-    asyncio.create_task(execute_job_async(job_id, internal_request, job_state, connection_manager))
+    asyncio.create_task(execute_job_async(job_id, internal_request, job_state))
 
     return CreateJobResponse(
         job_id=job_id,
@@ -110,40 +103,3 @@ async def get_job_status(job_id: str):
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "version": "0.1.0"}
-
-
-@app.websocket("/ws/{job_id}")
-async def websocket_endpoint(websocket: WebSocket, job_id: str):
-    job_state = job_manager.get_job(job_id)
-    if job_state is None:
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
-        return
-
-    await connection_manager.connect(websocket, job_id)
-
-    try:
-        while True:
-            try:
-                message = await websocket.receive()
-                if "text" in message:
-                    data = message["text"]
-                    try:
-                        parsed = json.loads(data)
-                        if parsed.get("type") == "ping":
-                            from datetime import datetime
-
-                            await websocket.send_text(
-                                json.dumps(
-                                    {
-                                        "type": "pong",
-                                        "data": {"timestamp": datetime.utcnow().isoformat()},
-                                    }
-                                )
-                            )
-                    except json.JSONDecodeError:
-                        pass
-            except Exception as e:
-                logger.error(f"WebSocket receive error: {e}")
-                break
-    except WebSocketDisconnect:
-        connection_manager.disconnect(websocket, job_id)

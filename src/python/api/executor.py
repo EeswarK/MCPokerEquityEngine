@@ -5,15 +5,12 @@ from typing import Dict, Optional
 
 from ..models.job import JobRequest
 from .job_manager import JobState
-from .models import ErrorResponse, WebSocketMessage
-from .websocket import ConnectionManager
 
 
 def execute_job_sync(
     job_id: str,
     request: JobRequest,
     job_state: JobState,
-    connection_manager: ConnectionManager,
 ):
     telemetry_process: Optional[subprocess.Popen] = None
 
@@ -67,17 +64,6 @@ def execute_job_sync(
         error_msg = str(e)
         job_state.fail(error_msg)
 
-        error_response = ErrorResponse(
-            error=error_msg,
-            code="SIMULATION_ERROR",
-        )
-
-        error_message = WebSocketMessage(
-            type="error",
-            data=error_response.model_dump(),
-        )
-        connection_manager.broadcast(job_id, error_message.model_dump_json())
-
     finally:
         if telemetry_process:
             try:
@@ -98,7 +84,6 @@ async def execute_job_async(
     job_id: str,
     request: JobRequest,
     job_state: JobState,
-    connection_manager: ConnectionManager,
 ):
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(
@@ -107,5 +92,4 @@ async def execute_job_async(
         job_id,
         request,
         job_state,
-        connection_manager,
     )

@@ -1,0 +1,27 @@
+[Unit]
+Description=C++ Poker Equity Engine API Server
+After=network.target
+
+[Service]
+Type=simple
+User=poker-engine
+Group=poker-engine
+WorkingDirectory=/opt/poker-engine
+
+# Environment variables
+Environment="TELEMETRY_HOST=poker-engine.ddns.net"
+# We set this to 443 because the frontend connects via Nginx (WSS)
+Environment="TELEMETRY_PORT=443"
+Environment="TELEMETRY_PROTOCOL=wss"
+
+# ExecStart runs the compiled binary on port 8002
+# Assumes the binary is in the build directory as per previous steps
+ExecStart=/opt/poker-engine/src/cpp/poker_engine/build/poker_engine 8002
+
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
