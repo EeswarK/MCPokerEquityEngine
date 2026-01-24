@@ -18,9 +18,9 @@
 - [x] Task: Implement PHEvaluator (7-card) 6d08e88
     - [x] Implement rank-suit decomposition logic.
     - [x] Implement prefetching multiplier.
-- [ ] Task: Implement Two Plus Two Evaluator (7-card)
-    - [ ] Implement state machine lookup logic.
-    - [ ] Implement prefetching multiplier.
+- [x] Task: Implement Two Plus Two Evaluator (7-card) 95f04a7
+    - [x] Implement state machine lookup logic.
+    - [x] Implement prefetching multiplier.
 - [ ] Task: Implement OMPEval (7-card)
     - [ ] Implement bit manipulation logic.
     - [ ] Ensure SIMD-ready structure.
