@@ -11,7 +11,7 @@
     - [x] Modify `telemetry.fbs` (if used for job config) or relevant JSON utils to handle new types.
 - [x] Task: Conductor - User Manual Verification 'Phase 1: Foundation & Data Models' (Protocol in workflow.md)
 
-## Phase 2: C++ Engine - Core Algorithms
+## Phase 2: C++ Engine - Core Algorithms [checkpoint: b99f1ad]
 - [x] Task: Implement Cactus Kev Evaluator (7-card) bff3550
     - [x] Port/implement prime product logic.
     - [x] Implement Perfect Hash multiplier.
@@ -24,7 +24,7 @@
 - [x] Task: Implement OMPEval (7-card) 12fbede
     - [x] Implement bit manipulation logic.
     - [x] Ensure SIMD-ready structure.
-- [ ] Task: Conductor - User Manual Verification 'Phase 2: C++ Engine - Core Algorithms' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 2: C++ Engine - Core Algorithms' (Protocol in workflow.md)
 
 ## Phase 3: C++ Engine - Global Optimizations
 - [ ] Task: Implement SIMD Framework
