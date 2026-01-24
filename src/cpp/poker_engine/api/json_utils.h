@@ -19,6 +19,8 @@ bool parse_create_job_request(
     int& num_opponents,
     int& num_simulations,
     std::string& mode,
+    std::string& algorithm,
+    std::vector<std::string>& optimizations,
     int& num_workers);
 
 // Serialize CreateJobResponse

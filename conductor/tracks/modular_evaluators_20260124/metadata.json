@@ -1,0 +1,8 @@
+{
+  "track_id": "modular_evaluators_20260124",
+  "type": "feature",
+  "status": "new",
+  "created_at": "2026-01-24T18:00:00Z",
+  "updated_at": "2026-01-24T18:00:00Z",
+  "description": "Implement new 7-card hand evaluators (Cactus Kev, PHEvaluator, Two Plus Two, OMPEval) with modular multipliers (SIMD, Multithreading, Perfect Hash, Prefetching) and a modern UI using Shadcn checkboxes and tooltips."
+}

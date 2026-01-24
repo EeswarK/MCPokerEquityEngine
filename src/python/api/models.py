@@ -14,6 +14,21 @@ class EngineMode(str, Enum):
     MULTIPROCESSING = "multiprocessing"
 
 
+class AlgorithmType(str, Enum):
+    NAIVE = "naive"
+    CACTUS_KEV = "cactus_kev"
+    PH_EVALUATOR = "ph_evaluator"
+    TWO_PLUS_TWO = "two_plus_two"
+    OMP_EVAL = "omp_eval"
+
+
+class OptimizationType(str, Enum):
+    MULTITHREADING = "multithreading"
+    SIMD = "simd"
+    PERFECT_HASH = "perfect_hash"
+    PREFETCHING = "prefetching"
+
+
 class CardModel(BaseModel):
     rank: int = Field(ge=2, le=14)
     suit: int = Field(ge=0, le=3)
@@ -25,6 +40,8 @@ class CreateJobRequest(BaseModel):
     num_opponents: int = Field(ge=1, le=9, default=1)
     num_simulations: int = Field(ge=1000, le=10000000, default=100000)
     mode: EngineMode = EngineMode.SENZEE
+    algorithm: AlgorithmType = AlgorithmType.NAIVE
+    optimizations: List[OptimizationType] = Field(default_factory=list)
     num_workers: Optional[int] = Field(None, gt=0)
 
     @field_validator("board")
@@ -104,5 +121,7 @@ def create_job_request_to_internal(api_request: CreateJobRequest) -> InternalJob
         num_opponents=api_request.num_opponents,
         num_simulations=api_request.num_simulations,
         mode=api_request.mode.value,
+        algorithm=api_request.algorithm.value,
+        optimizations=[opt.value for opt in api_request.optimizations],
         num_workers=api_request.num_workers,
     )

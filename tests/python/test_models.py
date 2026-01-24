@@ -1,5 +1,7 @@
 import pytest
+from pydantic import ValidationError
 
+from src.python.api.models import AlgorithmType, CreateJobRequest, OptimizationType
 from src.python.models.card import Card
 from src.python.models.job import EquityResult, JobRequest, PerformanceMetrics
 
@@ -38,6 +40,8 @@ def test_job_request_validation():
     request = JobRequest(range_spec=range_spec)
     assert request.num_opponents == 1
     assert request.num_simulations == 100000
+    assert request.algorithm == "naive"
+    assert request.optimizations == []
 
 
 def test_job_request_validation_opponents():
@@ -81,3 +85,30 @@ def test_equity_result():
     assert data["hand_name"] == "AA"
     assert data["equity"] == 0.85
     assert data["wins"] == 850
+
+
+def test_create_job_request_new_fields():
+    def mk_card(r, s):
+        return {"rank": r, "suit": s}
+
+    valid_request = {
+        "range_spec": {"AA": [mk_card(14, 0), mk_card(14, 1)]},
+        "algorithm": "cactus_kev",
+        "optimizations": ["perfect_hash", "multithreading"]
+    }
+    
+    req = CreateJobRequest(**valid_request)
+    assert req.algorithm == AlgorithmType.CACTUS_KEV
+    assert req.optimizations == [OptimizationType.PERFECT_HASH, OptimizationType.MULTITHREADING]
+
+def test_create_job_request_invalid_algorithm():
+    def mk_card(r, s):
+        return {"rank": r, "suit": s}
+
+    invalid_request = {
+        "range_spec": {"AA": [mk_card(14, 0), mk_card(14, 1)]},
+        "algorithm": "invalid_algo"
+    }
+    
+    with pytest.raises(ValidationError):
+        CreateJobRequest(**invalid_request)

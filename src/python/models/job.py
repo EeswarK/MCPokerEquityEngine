@@ -11,11 +11,15 @@ class JobRequest:
     num_opponents: int = 1
     num_simulations: int = 100000
     mode: str = "base_python"
+    algorithm: str = "naive"
+    optimizations: List[str] = None
     num_workers: Optional[int] = None
 
     def __post_init__(self):
         if self.board is None:
             self.board = []
+        if self.optimizations is None:
+            self.optimizations = []
         if not (1 <= self.num_opponents <= 9):
             raise ValueError(f"num_opponents must be 1-9, got {self.num_opponents}")
         if not (1000 <= self.num_simulations <= 10000000):

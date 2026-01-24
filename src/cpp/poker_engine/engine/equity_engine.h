@@ -11,13 +11,16 @@
 #include <functional>
 #include <memory>
 
-// Job request (matches Python JobRequest)
+// JobRequest (matches Python JobRequest)
 struct JobRequest {
     std::unordered_map<std::string, std::vector<Card>> range_spec;
     std::vector<Card> board;
     int num_opponents;
     int num_simulations;
     std::string mode;
+    std::string algorithm;
+    std::vector<std::string> optimizations;
+    int num_workers;
 };
 
 class EquityEngine {

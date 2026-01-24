@@ -9,6 +9,8 @@ bool parse_create_job_request(
     int& num_opponents,
     int& num_simulations,
     std::string& mode,
+    std::string& algorithm,
+    std::vector<std::string>& optimizations,
     int& num_workers) {
 
     using namespace rapidjson;
@@ -53,6 +55,16 @@ bool parse_create_job_request(
     num_opponents = doc.HasMember("num_opponents") ? doc["num_opponents"].GetInt() : 1;
     num_simulations = doc.HasMember("num_simulations") ? doc["num_simulations"].GetInt() : 100000;
     mode = doc.HasMember("mode") ? doc["mode"].GetString() : "cpp_naive";
+    algorithm = doc.HasMember("algorithm") ? doc["algorithm"].GetString() : "naive";
+    
+    // Parse optimizations (optional array)
+    if (doc.HasMember("optimizations") && doc["optimizations"].IsArray()) {
+        const Value& opts_arr = doc["optimizations"];
+        for (SizeType i = 0; i < opts_arr.Size(); ++i) {
+            optimizations.push_back(opts_arr[i].GetString());
+        }
+    }
+
     num_workers = doc.HasMember("num_workers") ? doc["num_workers"].GetInt() : 0;
 
     return true;

@@ -23,7 +23,7 @@ FetchContent_MakeAvailable(httplib)
 FetchContent_Declare(
     rapidjson
     GIT_REPOSITORY https://github.com/Tencent/rapidjson.git
-    GIT_TAG v1.1.0
+    GIT_TAG master
 )
 set(RAPIDJSON_BUILD_DOC OFF CACHE BOOL "Don't build RapidJSON docs")
 set(RAPIDJSON_BUILD_EXAMPLES OFF CACHE BOOL "Don't build RapidJSON examples")
@@ -62,3 +62,38 @@ if(UNIX AND NOT APPLE)
 endif()
 
 install(TARGETS poker_engine DESTINATION bin)
+
+# --- Testing ---
+
+# GoogleTest
+FetchContent_Declare(
+  googletest
+  URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip
+)
+# For Windows: Prevent overriding the parent project's compiler/linker settings
+set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(googletest)
+
+enable_testing()
+
+add_executable(unit_tests
+    tests/test_hand_types.cpp
+    tests/test_json_utils.cpp
+    api/json_utils.cpp
+    core/card.cpp
+    engine/shared_memory_writer.cpp
+    api/job_manager.cpp
+)
+
+target_include_directories(unit_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${httplib_SOURCE_DIR}
+    ${rapidjson_SOURCE_DIR}/include
+)
+
+target_link_libraries(unit_tests PRIVATE
+    gtest_main
+)
+
+include(GoogleTest)
+gtest_discover_tests(unit_tests)

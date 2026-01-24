@@ -3,6 +3,24 @@
 
 #include <cstdint>
 
+// Evaluator types for selecting the core algorithm
+enum class EvaluatorType : uint8_t {
+    NAIVE = 0,
+    CACTUS_KEV = 1,
+    PH_EVALUATOR = 2,
+    TWO_PLUS_TWO = 3,
+    OMP_EVAL = 4
+};
+
+// Optimization flags (bitmask)
+enum OptimizationFlags : uint8_t {
+    NONE = 0,
+    MULTITHREADING = 1 << 0, // 1
+    SIMD = 1 << 1,           // 2
+    PERFECT_HASH = 1 << 2,   // 4
+    PREFETCHING = 1 << 3     // 8
+};
+
 // Hand type values (matches Python get_hand_type)
 enum HandType : uint8_t {
     HIGH_CARD = 0,

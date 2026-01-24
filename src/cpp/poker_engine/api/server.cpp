@@ -69,10 +69,12 @@ void APIServer::setup_routes() {
         std::unordered_map<std::string, std::vector<Card>> range_spec;
         std::vector<Card> board;
         int num_opponents, num_simulations, num_workers;
-        std::string mode;
+        std::string mode, algorithm;
+        std::vector<std::string> optimizations;
 
         if (!parse_create_job_request(req.body, range_spec, board,
-                                      num_opponents, num_simulations, mode, num_workers)) {
+                                      num_opponents, num_simulations, mode, 
+                                      algorithm, optimizations, num_workers)) {
             std::cerr << "Failed to parse request body" << std::endl;
             res.status = 400;
             res.set_content(serialize_error_response("Invalid request body"), "application/json");
@@ -82,7 +84,7 @@ void APIServer::setup_routes() {
 
         // Generate job ID
         std::string job_id = generate_uuid();
-        std::cout << "Created job: " << job_id << " mode=" << mode << std::endl;
+        std::cout << "Created job: " << job_id << " mode=" << mode << " algorithm=" << algorithm << std::endl;
 
         auto job_state = job_manager_.create_job(job_id);
 
@@ -111,6 +113,9 @@ void APIServer::setup_routes() {
         job_req.num_opponents = num_opponents;
         job_req.num_simulations = num_simulations;
         job_req.mode = mode;
+        job_req.algorithm = algorithm;
+        job_req.optimizations = optimizations;
+        job_req.num_workers = num_workers;
 
         // Execute job in background thread
         std::thread([this, job_id, job_req]() {
