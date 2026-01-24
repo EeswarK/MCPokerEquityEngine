@@ -82,9 +82,11 @@ add_executable(unit_tests
     tests/test_cactus_kev.cpp
     tests/test_ph_evaluator.cpp
     tests/test_two_plus_two.cpp
+    tests/test_omp_eval.cpp
     evaluators/cactus_kev_evaluator.cpp
     evaluators/ph_evaluator.cpp
     evaluators/two_plus_two_evaluator.cpp
+    evaluators/omp_eval.cpp
     api/json_utils.cpp
     core/card.cpp
     engine/shared_memory_writer.cpp
