@@ -15,9 +15,9 @@
 - [x] Task: Implement Cactus Kev Evaluator (7-card) bff3550
     - [x] Port/implement prime product logic.
     - [x] Implement Perfect Hash multiplier.
-- [ ] Task: Implement PHEvaluator (7-card)
-    - [ ] Implement rank-suit decomposition logic.
-    - [ ] Implement prefetching multiplier.
+- [x] Task: Implement PHEvaluator (7-card) 6d08e88
+    - [x] Implement rank-suit decomposition logic.
+    - [x] Implement prefetching multiplier.
 - [ ] Task: Implement Two Plus Two Evaluator (7-card)
     - [ ] Implement state machine lookup logic.
     - [ ] Implement prefetching multiplier.

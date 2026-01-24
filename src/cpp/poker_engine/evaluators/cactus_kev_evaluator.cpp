@@ -44,7 +44,7 @@ static int unsuited_lookup[4888]; // Using perfect hash, this size varies
 static bool tables_initialized = false;
 
 // Helpers to initialize tables
-static void init_tables() {
+void CactusKevEvaluator::init_tables() {
     if (tables_initialized) return;
 
     // TODO: Populate tables
@@ -59,6 +59,14 @@ static void init_tables() {
     // we can use a logical fallback or minimal tables. 
     
     tables_initialized = true;
+}
+
+void CactusKevEvaluator::populate_flushes() {
+    // Stub
+}
+
+void CactusKevEvaluator::populate_unique5() {
+    // Stub
 }
 
 CactusKevEvaluator::CactusKevEvaluator() {
