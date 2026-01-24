@@ -12,9 +12,9 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 1: Foundation & Data Models' (Protocol in workflow.md)
 
 ## Phase 2: C++ Engine - Core Algorithms
-- [ ] Task: Implement Cactus Kev Evaluator (7-card)
-    - [ ] Port/implement prime product logic.
-    - [ ] Implement Perfect Hash multiplier.
+- [x] Task: Implement Cactus Kev Evaluator (7-card) bff3550
+    - [x] Port/implement prime product logic.
+    - [x] Implement Perfect Hash multiplier.
 - [ ] Task: Implement PHEvaluator (7-card)
     - [ ] Implement rank-suit decomposition logic.
     - [ ] Implement prefetching multiplier.
