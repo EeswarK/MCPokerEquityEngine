@@ -83,6 +83,7 @@ add_executable(unit_tests
     tests/test_ph_evaluator.cpp
     tests/test_two_plus_two.cpp
     tests/test_omp_eval.cpp
+    tests/test_simd_helper.cpp
     evaluators/cactus_kev_evaluator.cpp
     evaluators/ph_evaluator.cpp
     evaluators/two_plus_two_evaluator.cpp
