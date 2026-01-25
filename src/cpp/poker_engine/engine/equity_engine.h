@@ -3,6 +3,10 @@
 
 #include "core/card.h"
 #include "evaluators/naive_evaluator.h"
+#include "evaluators/cactus_kev_evaluator.h"
+#include "evaluators/ph_evaluator.h"
+#include "evaluators/two_plus_two_evaluator.h"
+#include "evaluators/omp_eval.h"
 #include "equity_result.h"
 #include "shared_memory_writer.h"
 #include <string>
@@ -10,8 +14,9 @@
 #include <unordered_map>
 #include <functional>
 #include <memory>
+#include <atomic>
 
-// JobRequest (matches Python JobRequest)
+// Job request (matches Python JobRequest)
 struct JobRequest {
     std::unordered_map<std::string, std::vector<Card>> range_spec;
     std::vector<Card> board;
@@ -25,11 +30,16 @@ struct JobRequest {
 
 class EquityEngine {
 private:
-    NaiveEvaluator evaluator_;
+    NaiveEvaluator naive_evaluator_;
+    CactusKevEvaluator cactus_kev_evaluator_;
+    PHEvaluator ph_evaluator_;
+    TwoPlusTwoEvaluator tpt_evaluator_;
+    OMPEval omp_evaluator_;
+
     std::string mode_;
     std::unique_ptr<SharedMemoryWriter> shm_writer_;
 
-    uint64_t simulations_processed_;
+    std::atomic<uint64_t> simulations_processed_;
     uint64_t update_frequency_;
     uint64_t last_update_count_;
 
@@ -55,7 +65,9 @@ private:
         int num_opponents,
         int num_simulations,
         const std::string& hand_name,
-        std::unordered_map<std::string, EquityResult>& results);
+        std::unordered_map<std::string, EquityResult>& results,
+        const std::string& algorithm = "naive",
+        int num_workers = 1);
 };
 
 #endif // ENGINE_EQUITY_ENGINE_H

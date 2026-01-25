@@ -2,6 +2,7 @@
 #define EVALUATORS_TWO_PLUS_TWO_EVALUATOR_H
 
 #include "core/card.h"
+#include "hand_types.h"
 #include <vector>
 
 class TwoPlusTwoEvaluator {
@@ -15,10 +16,11 @@ public:
 private:
     void load_table(const char* filename);
     void prefetch(const std::vector<Card>& cards) const;
+    
+    // Fallback logic for when table is missing
+    int32_t evaluate_fallback(const std::vector<Card>& hole, const std::vector<Card>& board) const;
 
-    // The massive lookup table (would normally be loaded from disk or mmap)
-    // For now, we stub it or use a simplified mock.
-    // std::vector<int> lookup_table_;
+    std::vector<int32_t> lookup_table_;
     bool table_loaded_;
 };
 

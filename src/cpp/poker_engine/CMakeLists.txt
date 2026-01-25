@@ -36,6 +36,10 @@ set(SOURCES
     core/card.cpp
     core/deck.cpp
     evaluators/naive_evaluator.cpp
+    evaluators/cactus_kev_evaluator.cpp
+    evaluators/ph_evaluator.cpp
+    evaluators/two_plus_two_evaluator.cpp
+    evaluators/omp_eval.cpp
     engine/equity_engine.cpp
     engine/shared_memory_writer.cpp
     api/server.cpp
@@ -84,12 +88,17 @@ add_executable(unit_tests
     tests/test_two_plus_two.cpp
     tests/test_omp_eval.cpp
     tests/test_simd_helper.cpp
+    tests/test_multithreading.cpp
+    tests/test_evaluator_conformance.cpp
     evaluators/cactus_kev_evaluator.cpp
     evaluators/ph_evaluator.cpp
     evaluators/two_plus_two_evaluator.cpp
     evaluators/omp_eval.cpp
+    evaluators/naive_evaluator.cpp
+    engine/equity_engine.cpp
     api/json_utils.cpp
     core/card.cpp
+    core/deck.cpp
     engine/shared_memory_writer.cpp
     api/job_manager.cpp
 )

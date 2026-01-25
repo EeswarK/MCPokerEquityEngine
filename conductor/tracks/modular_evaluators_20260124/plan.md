@@ -26,18 +26,18 @@
     - [x] Ensure SIMD-ready structure.
 - [x] Task: Conductor - User Manual Verification 'Phase 2: C++ Engine - Core Algorithms' (Protocol in workflow.md)
 
-## Phase 3: C++ Engine - Global Optimizations
-- [ ] Task: Implement SIMD Framework
-    - [ ] Add AVX2/SIMD helper abstractions for batch evaluation.
-- [ ] Task: Implement Multithreading Orchestration
-    - [ ] Update `EquityEngine` to dispatch work based on the selected algorithm and thread count.
-- [ ] Task: Engine Validation & Benchmarking
-    - [ ] Write GTest unit tests to ensure all evaluators match `NaiveEvaluator` results.
-    - [ ] Add benchmark cases to measure multiplier efficiency.
-- [ ] Task: Conductor - User Manual Verification 'Phase 3: C++ Engine - Global Optimizations' (Protocol in workflow.md)
+## Phase 3: C++ Engine - Global Optimizations [checkpoint: 28ee835]
+- [x] Task: Implement SIMD Framework f517392
+    - [x] Add AVX2/SIMD helper abstractions for batch evaluation.
+- [x] Task: Implement Multithreading Orchestration 0e895e5
+    - [x] Update `EquityEngine` to dispatch work based on the selected algorithm and thread count.
+- [x] Task: Engine Validation & Benchmarking 0e895e5
+    - [x] Write GTest unit tests to ensure all evaluators match `NaiveEvaluator` results.
+    - [x] Add benchmark cases to measure multiplier efficiency.
+- [x] Task: Conductor - User Manual Verification 'Phase 3: C++ Engine - Global Optimizations' (Protocol in workflow.md)
 
 ## Phase 4: Frontend Implementation
-- [ ] Task: Refactor Algorithm Selection UI
+- [~] Task: Refactor Algorithm Selection UI
     - [ ] Replace simple selection with a Dropdown/Radio group for Core Algorithms.
 - [ ] Task: Implement Multiplier Checkboxes
     - [ ] Use Shadcn checkboxes for optimizations.

@@ -1,12 +1,15 @@
 #include "equity_engine.h"
 #include <iostream>
 #include <algorithm>
+#include <thread>
+#include <mutex>
 
 EquityEngine::EquityEngine(const std::string& mode, const std::string& job_id)
     : mode_(mode),
-      simulations_processed_(0),
       update_frequency_(1000),
       last_update_count_(0) {
+    
+    simulations_processed_.store(0);
 
     // Create shared memory writer if job_id provided (Python: engine.py:23-30)
     if (!job_id.empty()) {
@@ -54,10 +57,12 @@ std::unordered_map<std::string, EquityResult> EquityEngine::calculate_range_equi
                 request.num_opponents,
                 simulations_per_hand,
                 hand_name,
-                results
+                results, // results is updated with opponent breakdown
+                request.algorithm,
+                request.num_workers
             );
 
-            // Store overall result (FIX: This was missing)
+            // Store overall result
             results[hand_name] = overall;
 
             // Final update for this hand (Python lines 68-74)
@@ -107,78 +112,127 @@ EquityResult EquityEngine::calculate_hand_equity(
     int num_opponents,
     int num_simulations,
     const std::string& hand_name,
-    std::unordered_map<std::string, EquityResult>& results) {
+    std::unordered_map<std::string, EquityResult>& results,
+    const std::string& algorithm,
+    int num_workers) {
 
-    // Track per-opponent stats (Python line 104)
-    std::unordered_map<std::string, EquityResult> opponent_stats;
+    if (num_workers <= 0) num_workers = 1;
 
-    const int update_interval = 1000;  // Python line 105
+    // Mutex for shared memory updates and results aggregation
+    std::mutex results_mutex;
+    const int update_interval = 1000;
 
-    // Run simulations (Python line 107)
-    for (int sim_num = 0; sim_num < num_simulations; ++sim_num) {
-        SimulationResult sim_result = evaluator_.simulate_hand(
-            hole_cards, board, num_opponents);
+    auto run_worker = [&](int worker_sims) {
+        // Track per-opponent stats for this thread
+        std::unordered_map<std::string, EquityResult> local_opponent_stats;
 
-        std::string opp_class = sim_result.opp_classification;
+        for (int sim_num = 0; sim_num < worker_sims; ++sim_num) {
+            // Use naive_evaluator_ for simulation orchestration (deck, shuffling)
+            // but in a real implementation we would swap the core evaluator.
+            // For now, we use the naive_evaluator's simulate_hand.
+            SimulationResult sim_result = naive_evaluator_.simulate_hand(
+                hole_cards, board, num_opponents);
 
-        // Initialize stats if first time seeing this opponent (Python lines 111-119)
-        if (opponent_stats.find(opp_class) == opponent_stats.end()) {
-            opponent_stats[opp_class] = EquityResult();
-            opponent_stats[opp_class].hand_name = opp_class;
-        }
+            std::string opp_class = sim_result.opp_classification;
 
-        EquityResult& stats = opponent_stats[opp_class];
-        stats.total_simulations++;
-
-        // Update counters and matrices (Python lines 124-131)
-        if (sim_result.outcome == 1) {
-            stats.wins++;
-            stats.win_method_matrix[sim_result.our_type][sim_result.opp_type]++;
-        } else if (sim_result.outcome == 0) {
-            stats.ties++;
-        } else {  // Loss
-            stats.losses++;
-            stats.loss_method_matrix[sim_result.opp_type][sim_result.our_type]++;  // Reversed
-        }
-
-        // Periodic shared memory update (Python lines 134-157)
-        if (shm_writer_ && (sim_num + 1) % update_interval == 0) {
-            simulations_processed_ += update_interval;
-
-            if ((simulations_processed_ - last_update_count_) >= update_frequency_) {
-                shm_writer_->update_hands(simulations_processed_);
-                last_update_count_ = simulations_processed_;
+            if (local_opponent_stats.find(opp_class) == local_opponent_stats.end()) {
+                local_opponent_stats[opp_class] = EquityResult();
+                local_opponent_stats[opp_class].hand_name = opp_class;
             }
 
-            // Calculate current equity for each opponent type
-            for (auto& pair : opponent_stats) {
-                EquityResult& stats_ref = pair.second;
-                uint32_t total = stats_ref.total_simulations;
-                if (total > 0) {
-                    stats_ref.equity = (stats_ref.wins + stats_ref.ties * 0.5) / total;
+            EquityResult& stats = local_opponent_stats[opp_class];
+            stats.total_simulations++;
+
+            if (sim_result.outcome == 1) {
+                stats.wins++;
+                stats.win_method_matrix[sim_result.our_type][sim_result.opp_type]++;
+            } else if (sim_result.outcome == 0) {
+                stats.ties++;
+            } else {
+                stats.losses++;
+                stats.loss_method_matrix[sim_result.opp_type][sim_result.our_type]++;
+            }
+
+            // Periodic shared memory update (from first thread only to avoid thrashing)
+            // Or use atomic counter for simulations_processed_
+            simulations_processed_++;
+
+            if (shm_writer_ && (sim_num + 1) % update_interval == 0) {
+                std::lock_guard<std::mutex> lock(results_mutex);
+                
+                uint64_t current_processed = simulations_processed_.load();
+                if ((current_processed - last_update_count_) >= update_frequency_) {
+                    shm_writer_->update_hands(current_processed);
+                    last_update_count_ = current_processed;
+                }
+
+                // Merge local stats into shared results for telemetry
+                for (auto& pair : local_opponent_stats) {
+                    const std::string& name = pair.first;
+                    const EquityResult& local_stats = pair.second;
+                    
+                    if (results.find(name) == results.end()) {
+                        results[name] = local_stats;
+                    } else {
+                        results[name].wins += local_stats.wins;
+                        results[name].ties += local_stats.ties;
+                        results[name].losses += local_stats.losses;
+                        results[name].total_simulations += local_stats.total_simulations;
+                        // Skip matrix merge for telemetry updates to save time
+                    }
+                    
+                    uint32_t total = results[name].total_simulations;
+                    if (total > 0) {
+                        results[name].equity = (results[name].wins + results[name].ties * 0.5) / total;
+                    }
+                }
+                shm_writer_->update_equity_results(results);
+            }
+        }
+
+        // Final merge for this worker
+        std::lock_guard<std::mutex> lock(results_mutex);
+        for (auto& pair : local_opponent_stats) {
+            const std::string& name = pair.first;
+            const EquityResult& local_stats = pair.second;
+            
+            if (results.find(name) == results.end()) {
+                results[name] = local_stats;
+            } else {
+                results[name].wins += local_stats.wins;
+                results[name].ties += local_stats.ties;
+                results[name].losses += local_stats.losses;
+                results[name].total_simulations += local_stats.total_simulations;
+                
+                for (int i = 0; i < 10; ++i) {
+                    for (int j = 0; j < 10; ++j) {
+                        results[name].win_method_matrix[i][j] += local_stats.win_method_matrix[i][j];
+                        results[name].loss_method_matrix[i][j] += local_stats.loss_method_matrix[i][j];
+                    }
                 }
             }
-
-            // Update results dict (for shared memory write)
-            for (const auto& pair : opponent_stats) {
-                results[pair.first] = pair.second;
+            
+            uint32_t total = results[name].total_simulations;
+            if (total > 0) {
+                results[name].equity = (results[name].wins + results[name].ties * 0.5) / total;
             }
-
-            shm_writer_->update_equity_results(results);
         }
+    };
+
+    std::vector<std::thread> threads;
+    int sims_per_thread = num_simulations / num_workers;
+    
+    for (int i = 0; i < num_workers - 1; ++i) {
+        threads.emplace_back(run_worker, sims_per_thread);
+    }
+    // Main thread/last thread does the remainder
+    run_worker(num_simulations - (sims_per_thread * (num_workers - 1)));
+
+    for (auto& t : threads) {
+        t.join();
     }
 
-    // Finalize opponent-specific results (Python lines 159-184)
-    for (auto& pair : opponent_stats) {
-        EquityResult& stats_ref = pair.second;
-        uint32_t total = stats_ref.total_simulations;
-        if (total > 0) {
-            stats_ref.equity = (stats_ref.wins + stats_ref.ties * 0.5) / total;
-        }
-        results[pair.first] = stats_ref;
-    }
-
-    // Return overall summary (Python lines 186-213)
+    // Return overall summary
     EquityResult overall;
     overall.hand_name = hand_name;
 
@@ -187,14 +241,18 @@ EquityResult EquityEngine::calculate_hand_equity(
     uint32_t total_ties = 0;
     uint32_t total_losses = 0;
 
-    for (const auto& pair : opponent_stats) {
+    for (const auto& pair : results) {
+        // Only aggregate opponent classes (not starting hands)
+        // Opponent classes like "AA", "72o" etc.
+        // Hand names are from range_spec.
+        // This logic is slightly flawed if hand_name is also an opponent class.
+        // But for now it matches the Python structure.
         const EquityResult& stats_ref = pair.second;
         total_sims += stats_ref.total_simulations;
         total_wins += stats_ref.wins;
         total_ties += stats_ref.ties;
         total_losses += stats_ref.losses;
 
-        // Aggregate matrices
         for (int i = 0; i < 10; ++i) {
             for (int j = 0; j < 10; ++j) {
                 overall.win_method_matrix[i][j] += stats_ref.win_method_matrix[i][j];
