@@ -3,6 +3,7 @@
 
 #include "core/card.h"
 #include <vector>
+#include <array>
 
 class CactusKevEvaluator {
 public:

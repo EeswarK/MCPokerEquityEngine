@@ -1,12 +1,19 @@
 cmake_minimum_required(VERSION 3.15)
 project(poker_engine)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Default to MinSizeRel to save memory during compilation on small VMs
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE MinSizeRel)
+endif()
+
+# Architecture-specific flags for SIMD
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
+        add_compile_options(-mavx2 -msse4.1)
+    endif()
 endif()
 
 include(FetchContent)
