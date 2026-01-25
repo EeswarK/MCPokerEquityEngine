@@ -27,8 +27,8 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 2: C++ Engine - Core Algorithms' (Protocol in workflow.md)
 
 ## Phase 3: C++ Engine - Global Optimizations [checkpoint: 28ee835]
-- [ ] Task: Implement SIMD Framework f517392
-    - [ ] Add AVX2/SIMD helper abstractions for batch evaluation.
+- [x] Task: Implement SIMD Framework f517392
+    - [x] Add AVX2/SIMD helper abstractions for batch evaluation.
 - [ ] Task: Implement Multithreading Orchestration 0e895e5
     - [ ] Update `EquityEngine` to dispatch work based on the selected algorithm and thread count.
 - [ ] Task: Engine Validation & Benchmarking 0e895e5

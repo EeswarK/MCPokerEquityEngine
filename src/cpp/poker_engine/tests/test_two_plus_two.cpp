@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 #include "../evaluators/two_plus_two_evaluator.h"
 
+using namespace poker_engine;
+
 class TwoPlusTwoEvaluatorTest : public ::testing::Test {
 protected:
     TwoPlusTwoEvaluator evaluator;

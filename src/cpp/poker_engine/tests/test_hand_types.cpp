@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 #include "../evaluators/hand_types.h"
 
+using namespace poker_engine;
+
 TEST(HandTypesTest, EvaluatorTypeEnumExists) {
     // This should fail to compile if EvaluatorType is not defined
     EvaluatorType type = EvaluatorType::NAIVE;

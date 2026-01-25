@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <array>
 
+namespace poker_engine {
+
 PHEvaluator::PHEvaluator() {
     // Initialize rank/suit lookup tables if needed
 }
@@ -144,3 +146,4 @@ void PHEvaluator::prefetch(const std::vector<Card>& cards) const {
     // Multiplier: Prefetching data into cache
     // __builtin_prefetch(ptr);
 }
+}  // namespace poker_engine

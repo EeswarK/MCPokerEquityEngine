@@ -4,6 +4,8 @@
 #include <array>
 #include <numeric>
 
+namespace poker_engine {
+
 // Prime numbers for each rank (2-A)
 // 2=2, 3=3, 4=5, 5=7, 6=11, 7=13, 8=17, 9=19, T=23, J=29, Q=31, K=37, A=41
 static const int PRIMES[] = {2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41};
@@ -336,3 +338,4 @@ int CactusKevEvaluator::find_fast(uint32_t u) const {
     return r;
 
 }
+}  // namespace poker_engine

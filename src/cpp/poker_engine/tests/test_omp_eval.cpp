@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 #include "../evaluators/omp_eval.h"
 
+using namespace poker_engine;
+
 class OMPEvalTest : public ::testing::Test {
 protected:
     OMPEval evaluator;

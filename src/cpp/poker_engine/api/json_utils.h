@@ -9,19 +9,24 @@
 #include "job_manager.h"
 #include <string>
 #include <vector>
+#include <unordered_map>
+#include "engine/equity_engine.h"
 
-// Parse POST /api/jobs request body
-// Matches: src/python/api/models.py:22-36
-bool parse_create_job_request(
-    const std::string& json_str,
-    std::unordered_map<std::string, std::vector<Card>>& range_spec,
-    std::vector<Card>& board,
-    int& num_opponents,
-    int& num_simulations,
-    std::string& mode,
-    std::string& algorithm,
-    std::vector<std::string>& optimizations,
-    int& num_workers);
+// Forward declarations in namespace
+namespace poker_engine {
+    struct JobRequest;
+}
+
+bool parse_create_job_request(const std::string& json, 
+                              std::unordered_map<std::string, std::vector<Card>>& range_spec,
+                              
+                              std::vector<Card>& board,
+                              int& num_opponents,
+                              int& num_simulations,
+                              std::string& mode,
+                              std::string& algorithm,
+                              std::vector<std::string>& optimizations,
+                              int& num_workers);
 
 // Serialize CreateJobResponse
 // Matches: src/python/api/models.py:38-42

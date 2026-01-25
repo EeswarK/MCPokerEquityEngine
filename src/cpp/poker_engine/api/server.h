@@ -12,9 +12,9 @@ private:
     JobManager job_manager_;
     int port_;
 
-    void setup_routes();
     void setup_cors();
-    void execute_job(const std::string& job_id, const JobRequest& request);
+    void setup_routes();
+    void execute_job(const std::string& job_id, const poker_engine::JobRequest& request);
 
 public:
     explicit APIServer(int port = 8002);

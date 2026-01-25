@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <cstdio>
 
+namespace poker_engine {
+
 TwoPlusTwoEvaluator::TwoPlusTwoEvaluator() : table_loaded_(false) {
     load_table("HandRanks.dat");
 }
@@ -155,3 +157,4 @@ int32_t TwoPlusTwoEvaluator::evaluate_fallback(const std::vector<Card>& hole, co
 void TwoPlusTwoEvaluator::prefetch(const std::vector<Card>& cards) const {
     // __builtin_prefetch
 }
+}  // namespace poker_engine

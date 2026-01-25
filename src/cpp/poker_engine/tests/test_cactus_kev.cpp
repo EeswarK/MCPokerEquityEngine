@@ -2,6 +2,8 @@
 #include "../evaluators/cactus_kev_evaluator.h"
 #include "../evaluators/hand_types.h"
 
+using namespace poker_engine;
+
 class CactusKevTest : public ::testing::Test {
 protected:
     CactusKevEvaluator evaluator;

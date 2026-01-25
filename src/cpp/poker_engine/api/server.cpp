@@ -107,7 +107,7 @@ void APIServer::setup_routes() {
         }
 
         // Create job request
-        JobRequest job_req;
+        poker_engine::JobRequest job_req;
         job_req.range_spec = range_spec;
         job_req.board = board;
         job_req.num_opponents = num_opponents;
@@ -160,7 +160,7 @@ void APIServer::setup_routes() {
     });
 }
 
-void APIServer::execute_job(const std::string& job_id, const JobRequest& request) {
+void APIServer::execute_job(const std::string& job_id, const poker_engine::JobRequest& request) {
     auto job_state = job_manager_.get_job(job_id);
     if (!job_state) return;
 
@@ -202,7 +202,7 @@ void APIServer::execute_job(const std::string& job_id, const JobRequest& request
         }
 
         // Create engine with job_id for shared memory
-        EquityEngine engine(request.mode, job_id);
+        poker_engine::EquityEngine engine(request.mode, job_id);
 
         // Set progress callback
         engine.set_progress_callback(

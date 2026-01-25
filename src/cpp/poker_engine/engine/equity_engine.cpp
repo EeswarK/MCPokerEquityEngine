@@ -3,6 +3,9 @@
 #include <algorithm>
 #include <thread>
 #include <mutex>
+#include "core/deck.h"
+
+namespace poker_engine {
 
 EquityEngine::EquityEngine(const std::string& mode, const std::string& job_id)
     : mode_(mode),
@@ -11,7 +14,7 @@ EquityEngine::EquityEngine(const std::string& mode, const std::string& job_id)
     
     simulations_processed_.store(0);
 
-    // Create shared memory writer if job_id provided (Python: engine.py:23-30)
+    // Create shared memory writer if job_id provided
     if (!job_id.empty()) {
         shm_writer_ = std::make_unique<SharedMemoryWriter>(job_id);
         if (!shm_writer_->create()) {
@@ -26,7 +29,6 @@ void EquityEngine::set_progress_callback(
     progress_callback_ = callback;
 }
 
-// Matches: src/python/engine/engine.py:42-91
 std::unordered_map<std::string, EquityResult> EquityEngine::calculate_range_equity(
     const JobRequest& request) {
 
@@ -34,7 +36,6 @@ std::unordered_map<std::string, EquityResult> EquityEngine::calculate_range_equi
     simulations_processed_ = 0;
     last_update_count_ = 0;
 
-    // Extract hand names (Python line 47)
     std::vector<std::string> hand_names;
     for (const auto& pair : request.range_spec) {
         hand_names.push_back(pair.first);
@@ -48,24 +49,16 @@ std::unordered_map<std::string, EquityResult> EquityEngine::calculate_range_equi
     try {
         for (size_t idx = 0; idx < hand_names.size(); ++idx) {
             const std::string& hand_name = hand_names[idx];
-            const std::vector<Card>& hole_cards = request.range_spec.at(hand_name);
 
-            // Calculate equity for this hand (Python lines 54-61)
             EquityResult overall = calculate_hand_equity(
-                hole_cards,
-                request.board,
-                request.num_opponents,
-                simulations_per_hand,
+                request,
                 hand_name,
-                results, // results is updated with opponent breakdown
-                request.algorithm,
-                request.num_workers
+                simulations_per_hand,
+                results
             );
 
-            // Store overall result
             results[hand_name] = overall;
 
-            // Final update for this hand (Python lines 68-74)
             if (shm_writer_) {
                 uint64_t expected_total = (idx + 1) * simulations_per_hand;
                 if (simulations_processed_ < expected_total) {
@@ -75,7 +68,6 @@ std::unordered_map<std::string, EquityResult> EquityEngine::calculate_range_equi
                 shm_writer_->update_equity_results(results);
             }
 
-            // Report progress (Python lines 76-78)
             double progress = static_cast<double>(idx + 1) / total_hands;
             if (progress_callback_) {
                 std::unordered_map<std::string, double> current_results;
@@ -86,7 +78,6 @@ std::unordered_map<std::string, EquityResult> EquityEngine::calculate_range_equi
             }
         }
 
-        // Mark as completed (Python lines 80-83)
         if (shm_writer_) {
             shm_writer_->update_hands(simulations_processed_);
             shm_writer_->set_status(1);  // Completed
@@ -94,7 +85,6 @@ std::unordered_map<std::string, EquityResult> EquityEngine::calculate_range_equi
         }
 
     } catch (...) {
-        // Mark as failed (Python lines 85-89)
         if (shm_writer_) {
             shm_writer_->set_status(2);  // Failed
             shm_writer_->close();
@@ -105,170 +95,263 @@ std::unordered_map<std::string, EquityResult> EquityEngine::calculate_range_equi
     return results;
 }
 
-// Matches: src/python/engine/engine.py:93-213
 EquityResult EquityEngine::calculate_hand_equity(
-    const std::vector<Card>& hole_cards,
-    const std::vector<Card>& board,
-    int num_opponents,
-    int num_simulations,
+    const JobRequest& request,
     const std::string& hand_name,
-    std::unordered_map<std::string, EquityResult>& results,
-    const std::string& algorithm,
-    int num_workers) {
+    int simulations_per_hand,
+    std::unordered_map<std::string, EquityResult>& results) {
 
-    if (num_workers <= 0) num_workers = 1;
+  int num_workers = request.num_workers <= 0 ? 1 : request.num_workers;
+  std::mutex results_mutex;
+  const int update_interval = 1000;
 
-    // Mutex for shared memory updates and results aggregation
-    std::mutex results_mutex;
-    const int update_interval = 1000;
+  const std::vector<Card>& hole_cards = request.range_spec.at(hand_name);
 
-    auto run_worker = [&](int worker_sims) {
-        // Track per-opponent stats for this thread
-        std::unordered_map<std::string, EquityResult> local_opponent_stats;
+  auto run_worker = [&](int worker_sims) {
+    std::unordered_map<std::string, EquityResult> local_opponent_stats;
+    Deck deck;
 
-        for (int sim_num = 0; sim_num < worker_sims; ++sim_num) {
-            // Use naive_evaluator_ for simulation orchestration (deck, shuffling)
-            // but in a real implementation we would swap the core evaluator.
-            // For now, we use the naive_evaluator's simulate_hand.
-            SimulationResult sim_result = naive_evaluator_.simulate_hand(
-                hole_cards, board, num_opponents);
+    bool use_simd =
+        (request.algorithm == "omp" &&
+         std::find(request.optimizations.begin(), request.optimizations.end(),
+                   "simd") != request.optimizations.end());
 
-            std::string opp_class = sim_result.opp_classification;
+    int sim_num = 0;
+    while (sim_num < worker_sims) {
+      if (use_simd && (worker_sims - sim_num) >= SIMDConfig::kBatchSize) {
+        // SIMD Path: Process 8 simulations in a batch
+        HandBatch our_batch;
+        HandBatch opp_batch;
+        std::vector<std::string> opp_classes(SIMDConfig::kBatchSize);
 
-            if (local_opponent_stats.find(opp_class) == local_opponent_stats.end()) {
-                local_opponent_stats[opp_class] = EquityResult();
-                local_opponent_stats[opp_class].hand_name = opp_class;
-            }
+        for (int b = 0; b < SIMDConfig::kBatchSize; ++b) {
+          deck.reset();
+          for (const auto& card : hole_cards) deck.remove(card);
+          for (const auto& card : request.board) deck.remove(card);
 
-            EquityResult& stats = local_opponent_stats[opp_class];
-            stats.total_simulations++;
+          std::vector<Card> board_cards = request.board;
+          int remaining_board = 5 - static_cast<int>(request.board.size());
+          for (int i = 0; i < remaining_board; ++i) {
+            board_cards.push_back(deck.draw_random());
+          }
 
-            if (sim_result.outcome == 1) {
-                stats.wins++;
-                stats.win_method_matrix[sim_result.our_type][sim_result.opp_type]++;
-            } else if (sim_result.outcome == 0) {
-                stats.ties++;
-            } else {
-                stats.losses++;
-                stats.loss_method_matrix[sim_result.opp_type][sim_result.our_type]++;
-            }
+          std::vector<std::vector<Card>> opponent_hands;
+          for (int i = 0; i < request.num_opponents; ++i) {
+            opponent_hands.push_back(deck.sample(2));
+          }
 
-            // Periodic shared memory update (from first thread only to avoid thrashing)
-            // Or use atomic counter for simulations_processed_
-            simulations_processed_++;
+          size_t opp_idx = 0;  // Assume 1 opponent for batching test
+          const std::vector<Card>& opp_hand = opponent_hands[opp_idx];
+          opp_classes[b] = naive_evaluator_.classify_hole_cards(opp_hand);
 
-            if (shm_writer_ && (sim_num + 1) % update_interval == 0) {
-                std::lock_guard<std::mutex> lock(results_mutex);
-                
-                uint64_t current_processed = simulations_processed_.load();
-                if ((current_processed - last_update_count_) >= update_frequency_) {
-                    shm_writer_->update_hands(current_processed);
-                    last_update_count_ = current_processed;
-                }
-
-                // Merge local stats into shared results for telemetry
-                for (auto& pair : local_opponent_stats) {
-                    const std::string& name = pair.first;
-                    const EquityResult& local_stats = pair.second;
-                    
-                    if (results.find(name) == results.end()) {
-                        results[name] = local_stats;
-                    } else {
-                        results[name].wins += local_stats.wins;
-                        results[name].ties += local_stats.ties;
-                        results[name].losses += local_stats.losses;
-                        results[name].total_simulations += local_stats.total_simulations;
-                        // Skip matrix merge for telemetry updates to save time
-                    }
-                    
-                    uint32_t total = results[name].total_simulations;
-                    if (total > 0) {
-                        results[name].equity = (results[name].wins + results[name].ties * 0.5) / total;
-                    }
-                }
-                shm_writer_->update_equity_results(results);
-            }
+          // Pack into SoA HandBatch
+          for (int i = 0; i < 2; ++i) {
+            our_batch.ranks[i][b] = hole_cards[i].rank;
+            our_batch.suits[i][b] = hole_cards[i].suit;
+            opp_batch.ranks[i][b] = opp_hand[i].rank;
+            opp_batch.suits[i][b] = opp_hand[i].suit;
+          }
+          for (int i = 0; i < 5; ++i) {
+            our_batch.ranks[i + 2][b] = board_cards[i].rank;
+            our_batch.suits[i + 2][b] = board_cards[i].suit;
+            opp_batch.ranks[i + 2][b] = board_cards[i].rank;
+            opp_batch.suits[i + 2][b] = board_cards[i].suit;
+          }
         }
 
-        // Final merge for this worker
+        int32_t our_results[SIMDConfig::kBatchSize];
+        int32_t opp_results[SIMDConfig::kBatchSize];
+        omp_evaluator_.evaluate_batch(our_batch, our_results);
+        omp_evaluator_.evaluate_batch(opp_batch, opp_results);
+
+        for (int b = 0; b < SIMDConfig::kBatchSize; ++b) {
+          std::string& opp_class = opp_classes[b];
+          if (local_opponent_stats.find(opp_class) ==
+              local_opponent_stats.end()) {
+            local_opponent_stats[opp_class] = EquityResult();
+            local_opponent_stats[opp_class].hand_name = opp_class;
+          }
+          EquityResult& stats = local_opponent_stats[opp_class];
+          stats.total_simulations++;
+
+          if (our_results[b] > opp_results[b]) {
+            stats.wins++;
+            stats.win_method_matrix[get_hand_type(our_results[b])]
+                                   [get_hand_type(opp_results[b])]++;
+          } else if (our_results[b] == opp_results[b]) {
+            stats.ties++;
+          } else {
+            stats.losses++;
+            stats.loss_method_matrix[get_hand_type(opp_results[b])]
+                                    [get_hand_type(our_results[b])]++;
+          }
+        }
+        sim_num += SIMDConfig::kBatchSize;
+        simulations_processed_ += SIMDConfig::kBatchSize;
+      } else {
+        // Scalar Path
+        deck.reset();
+        for (const auto& card : hole_cards) deck.remove(card);
+        for (const auto& card : request.board) deck.remove(card);
+
+        std::vector<Card> board_cards = request.board;
+        int remaining_board = 5 - static_cast<int>(request.board.size());
+        for (int i = 0; i < remaining_board; ++i) {
+          board_cards.push_back(deck.draw_random());
+        }
+
+        std::vector<std::vector<Card>> opponent_hands;
+        for (int i = 0; i < request.num_opponents; ++i) {
+          opponent_hands.push_back(deck.sample(2));
+        }
+
+        int32_t our_value =
+            evaluate_with_algorithm(request.algorithm, hole_cards, board_cards);
+
+        int32_t max_opponent = 0;
+        size_t max_opp_idx = 0;
+        for (size_t i = 0; i < opponent_hands.size(); ++i) {
+          int32_t val = evaluate_with_algorithm(request.algorithm,
+                                                 opponent_hands[i], board_cards);
+          if (val > max_opponent) {
+            max_opponent = val;
+            max_opp_idx = i;
+          }
+        }
+
+        std::string opp_class =
+            opponent_hands.empty()
+                ? "??"
+                : naive_evaluator_.classify_hole_cards(opponent_hands[max_opp_idx]);
+
+        if (local_opponent_stats.find(opp_class) == local_opponent_stats.end()) {
+          local_opponent_stats[opp_class] = EquityResult();
+          local_opponent_stats[opp_class].hand_name = opp_class;
+        }
+
+        EquityResult& stats = local_opponent_stats[opp_class];
+        stats.total_simulations++;
+
+        if (our_value > max_opponent) {
+          stats.wins++;
+          stats.win_method_matrix[get_hand_type(our_value)]
+                                 [get_hand_type(max_opponent)]++;
+        } else if (our_value == max_opponent) {
+          stats.ties++;
+        } else {
+          stats.losses++;
+          stats.loss_method_matrix[get_hand_type(max_opponent)]
+                                  [get_hand_type(our_value)]++;
+        }
+
+        sim_num++;
+        simulations_processed_++;
+      }
+
+      if (shm_writer_ && (sim_num % update_interval == 0)) {
         std::lock_guard<std::mutex> lock(results_mutex);
+        uint64_t current_processed = simulations_processed_.load();
+        if ((current_processed - last_update_count_) >= update_frequency_) {
+          shm_writer_->update_hands(current_processed);
+          last_update_count_ = current_processed;
+        }
+
         for (auto& pair : local_opponent_stats) {
-            const std::string& name = pair.first;
-            const EquityResult& local_stats = pair.second;
-            
-            if (results.find(name) == results.end()) {
-                results[name] = local_stats;
-            } else {
-                results[name].wins += local_stats.wins;
-                results[name].ties += local_stats.ties;
-                results[name].losses += local_stats.losses;
-                results[name].total_simulations += local_stats.total_simulations;
-                
-                for (int i = 0; i < 10; ++i) {
-                    for (int j = 0; j < 10; ++j) {
-                        results[name].win_method_matrix[i][j] += local_stats.win_method_matrix[i][j];
-                        results[name].loss_method_matrix[i][j] += local_stats.loss_method_matrix[i][j];
-                    }
-                }
-            }
-            
-            uint32_t total = results[name].total_simulations;
-            if (total > 0) {
-                results[name].equity = (results[name].wins + results[name].ties * 0.5) / total;
-            }
+          const std::string& name = pair.first;
+          const EquityResult& local_stats = pair.second;
+          if (results.find(name) == results.end()) {
+            results[name] = local_stats;
+          } else {
+            results[name].wins += local_stats.wins;
+            results[name].ties += local_stats.ties;
+            results[name].losses += local_stats.losses;
+            results[name].total_simulations += local_stats.total_simulations;
+          }
+          uint32_t total = results[name].total_simulations;
+          if (total > 0) {
+            results[name].equity =
+                (results[name].wins + results[name].ties * 0.5) / total;
+          }
         }
-    };
-
-    std::vector<std::thread> threads;
-    int sims_per_thread = num_simulations / num_workers;
-    
-    for (int i = 0; i < num_workers - 1; ++i) {
-        threads.emplace_back(run_worker, sims_per_thread);
-    }
-    // Main thread/last thread does the remainder
-    run_worker(num_simulations - (sims_per_thread * (num_workers - 1)));
-
-    for (auto& t : threads) {
-        t.join();
+        shm_writer_->update_equity_results(results);
+      }
     }
 
-    // Return overall summary
-    EquityResult overall;
-    overall.hand_name = hand_name;
-
-    uint32_t total_sims = 0;
-    uint32_t total_wins = 0;
-    uint32_t total_ties = 0;
-    uint32_t total_losses = 0;
-
-    for (const auto& pair : results) {
-        // Only aggregate opponent classes (not starting hands)
-        // Opponent classes like "AA", "72o" etc.
-        // Hand names are from range_spec.
-        // This logic is slightly flawed if hand_name is also an opponent class.
-        // But for now it matches the Python structure.
-        const EquityResult& stats_ref = pair.second;
-        total_sims += stats_ref.total_simulations;
-        total_wins += stats_ref.wins;
-        total_ties += stats_ref.ties;
-        total_losses += stats_ref.losses;
-
+    std::lock_guard<std::mutex> lock(results_mutex);
+    for (auto& pair : local_opponent_stats) {
+      const std::string& name = pair.first;
+      const EquityResult& local_stats = pair.second;
+      if (results.find(name) == results.end()) {
+        results[name] = local_stats;
+      } else {
+        results[name].wins += local_stats.wins;
+        results[name].ties += local_stats.ties;
+        results[name].losses += local_stats.losses;
+        results[name].total_simulations += local_stats.total_simulations;
         for (int i = 0; i < 10; ++i) {
-            for (int j = 0; j < 10; ++j) {
-                overall.win_method_matrix[i][j] += stats_ref.win_method_matrix[i][j];
-                overall.loss_method_matrix[i][j] += stats_ref.loss_method_matrix[i][j];
-            }
+          for (int j = 0; j < 10; ++j) {
+            results[name].win_method_matrix[i][j] +=
+                local_stats.win_method_matrix[i][j];
+            results[name].loss_method_matrix[i][j] +=
+                local_stats.loss_method_matrix[i][j];
+          }
         }
+      }
+      uint32_t total = results[name].total_simulations;
+      if (total > 0) {
+        results[name].equity =
+            (results[name].wins + results[name].ties * 0.5) / total;
+      }
     }
+  };
 
-    overall.total_simulations = total_sims;
-    overall.wins = total_wins;
-    overall.ties = total_ties;
-    overall.losses = total_losses;
+  std::vector<std::thread> threads;
+  int sims_per_thread = simulations_per_hand / num_workers;
+  for (int i = 0; i < num_workers - 1; ++i) {
+    threads.emplace_back(run_worker, sims_per_thread);
+  }
+  run_worker(simulations_per_hand - (sims_per_thread * (num_workers - 1)));
 
-    if (total_sims > 0) {
-        overall.equity = static_cast<double>(total_wins + total_ties * 0.5) / total_sims;
+  for (auto& t : threads) t.join();
+
+  EquityResult overall;
+  overall.hand_name = hand_name;
+  uint32_t total_sims = 0, total_wins = 0, total_ties = 0, total_losses = 0;
+
+  for (const auto& pair : results) {
+    const EquityResult& stats_ref = pair.second;
+    total_sims += stats_ref.total_simulations;
+    total_wins += stats_ref.wins;
+    total_ties += stats_ref.ties;
+    total_losses += stats_ref.losses;
+    for (int i = 0; i < 10; ++i) {
+      for (int j = 0; j < 10; ++j) {
+        overall.win_method_matrix[i][j] += stats_ref.win_method_matrix[i][j];
+        overall.loss_method_matrix[i][j] += stats_ref.loss_method_matrix[i][j];
+      }
     }
+  }
 
-    return overall;
+  overall.total_simulations = total_sims;
+  overall.wins = total_wins;
+  overall.ties = total_ties;
+  overall.losses = total_losses;
+  if (total_sims > 0) {
+    overall.equity =
+        static_cast<double>(total_wins + total_ties * 0.5) / total_sims;
+  }
+
+  return overall;
 }
+
+int32_t EquityEngine::evaluate_with_algorithm(const std::string& algorithm,
+                                               const std::vector<Card>& hole,
+                                               const std::vector<Card>& board) const {
+    if (algorithm == "cactus_kev") return cactus_kev_evaluator_.evaluate_hand(hole, board);
+    if (algorithm == "perfect_hash") return ph_evaluator_.evaluate_hand(hole, board);
+    if (algorithm == "two_plus_two") return tpt_evaluator_.evaluate_hand(hole, board);
+    if (algorithm == "omp") return omp_evaluator_.evaluate_hand(hole, board);
+    return naive_evaluator_.evaluate_hand(hole, board);
+}
+
+}  // namespace poker_engine

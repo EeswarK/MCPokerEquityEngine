@@ -3,6 +3,8 @@
 
 #include <cstdint>
 
+namespace poker_engine {
+
 // Evaluator types for selecting the core algorithm
 enum class EvaluatorType : uint8_t {
     NAIVE = 0,
@@ -60,5 +62,7 @@ inline HandType get_hand_type(int32_t hand_value) {
     if (hand_value >= ONE_PAIR_MIN) return ONE_PAIR;
     return HIGH_CARD;
 }
+
+}  // namespace poker_engine
 
 #endif // EVALUATORS_HAND_TYPES_H

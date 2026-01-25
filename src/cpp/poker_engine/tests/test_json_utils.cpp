@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 #include "../api/json_utils.h"
 
+using namespace poker_engine;
+
 TEST(JsonUtilsTest, ParseCreateJobRequest_AllFields) {
     std::string json_str = R"({
         "range_spec": {

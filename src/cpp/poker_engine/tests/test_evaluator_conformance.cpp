@@ -5,6 +5,8 @@
 #include "../evaluators/two_plus_two_evaluator.h"
 #include "../evaluators/omp_eval.h"
 
+using namespace poker_engine;
+
 // Define types to test
 using EvaluatorTypes = ::testing::Types<
     NaiveEvaluator,

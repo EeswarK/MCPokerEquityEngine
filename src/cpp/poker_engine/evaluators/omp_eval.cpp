@@ -1,8 +1,7 @@
 #include "omp_eval.h"
+#include <algorithm>
 
-#if defined(__x86_64__) || defined(_M_X64)
-#include <immintrin.h>
-#endif
+namespace poker_engine {
 
 OMPEval::OMPEval() {}
 
@@ -89,13 +88,27 @@ int32_t OMPEval::evaluate_hand(const std::vector<Card>& hole_cards,
     return 0;
 }
 
-void OMPEval::evaluate_batch(const std::vector<std::vector<Card>>& hands, 
-                             std::vector<int32_t>& scores) const {
-#if defined(__x86_64__) || defined(_M_X64)
-    // SIMD implementation (AVX2) would go here
-    // for (int i = 0; i < hands.size(); i += 8) { ... }
-#else
-    // Fallback for non-x86 architectures (e.g. ARM64)
-    // or just leave empty as this is a placeholder
+void OMPEval::evaluate_batch(const HandBatch& batch, int32_t* results) const {
+#ifdef USE_AVX2
+    // TODO: Implement vectorized AVX2 logic
+    // For now, use scalar fallback
 #endif
+
+    // Scalar fallback for batch
+    for (int i = 0; i < SIMDConfig::kBatchSize; ++i) {
+        std::vector<Card> hole = {
+            Card(static_cast<uint8_t>(batch.ranks[0][i]), static_cast<uint8_t>(batch.suits[0][i])),
+            Card(static_cast<uint8_t>(batch.ranks[1][i]), static_cast<uint8_t>(batch.suits[1][i]))
+        };
+        std::vector<Card> board = {
+            Card(static_cast<uint8_t>(batch.ranks[2][i]), static_cast<uint8_t>(batch.suits[2][i])),
+            Card(static_cast<uint8_t>(batch.ranks[3][i]), static_cast<uint8_t>(batch.suits[3][i])),
+            Card(static_cast<uint8_t>(batch.ranks[4][i]), static_cast<uint8_t>(batch.suits[4][i])),
+            Card(static_cast<uint8_t>(batch.ranks[5][i]), static_cast<uint8_t>(batch.suits[5][i])),
+            Card(static_cast<uint8_t>(batch.ranks[6][i]), static_cast<uint8_t>(batch.suits[6][i]))
+        };
+        results[i] = evaluate_hand(hole, board);
+    }
 }
+
+}  // namespace poker_engine

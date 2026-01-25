@@ -2,6 +2,8 @@
 #include "../evaluators/ph_evaluator.h"
 #include "../evaluators/hand_types.h"
 
+using namespace poker_engine;
+
 class PHEvaluatorTest : public ::testing::Test {
 protected:
     PHEvaluator evaluator;

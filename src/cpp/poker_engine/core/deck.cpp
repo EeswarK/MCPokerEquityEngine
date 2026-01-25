@@ -23,6 +23,15 @@ void Deck::remove(const Card& card) {
     cards_.erase(card);
 }
 
+void Deck::reset() {
+    cards_.clear();
+    for (uint8_t r = 2; r <= 14; ++r) {
+        for (uint8_t s = 0; s < 4; ++s) {
+            cards_.insert(Card(r, s));
+        }
+    }
+}
+
 bool Deck::contains(const Card& card) const {
     return cards_.find(card) != cards_.end();
 }

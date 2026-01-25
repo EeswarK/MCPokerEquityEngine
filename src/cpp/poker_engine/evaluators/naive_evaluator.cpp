@@ -4,6 +4,8 @@
 #include <unordered_map>
 #include <unordered_set>
 
+namespace poker_engine {
+
 // Matches: src/python/engine/strategies/naive/evaluator.py:6-27
 int32_t NaiveEvaluator::evaluate_hand(
     const std::vector<Card>& hole_cards,
@@ -307,3 +309,4 @@ std::string NaiveEvaluator::classify_hole_cards(const std::vector<Card>& hole_ca
 
     return std::string(1, rank_to_char(high_rank)) + rank_to_char(low_rank) + suffix;
 }
+}  // namespace poker_engine

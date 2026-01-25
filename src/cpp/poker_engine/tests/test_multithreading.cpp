@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 #include "../engine/equity_engine.h"
 
+using namespace poker_engine;
+
 TEST(EquityEngineTest, MultithreadingWorks) {
     EquityEngine engine("test_mode");
     

@@ -20,6 +20,9 @@ public:
     // Remove card from deck (Python: deck.discard())
     void remove(const Card& card);
 
+    // Reset deck to full 52 cards
+    void reset();
+
     // Check if deck contains card
     bool contains(const Card& card) const;
 
