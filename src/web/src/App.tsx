@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { ModeSelector } from "./components/ModeSelector";
+import { AlgorithmSelector } from "./components/AlgorithmSelector";
+import { OptimizationSelector } from "./components/OptimizationSelector";
 import { Heatmap } from "./components/Heatmap";
 import { Metrics } from "./components/Metrics";
 import { JobStatusDisplay } from "./components/JobStatus";
@@ -9,16 +10,29 @@ import { WinMethodChart } from "./components/WinMethodChart";
 import { EquityCategoryChart } from "./components/EquityCategoryChart";
 import { SimulationCountSelector } from "./components/SimulationCountSelector";
 import { useJob } from "./hooks/useJob";
-import { EngineMode, Card as CardType } from "./types";
+import { AlgorithmType, OptimizationType, ImplementationType, Card as CardType } from "./types";
 import { Button } from "./components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
+import { ToggleGroup, ToggleGroupItem } from "./components/ui/toggle-group";
 
 function App() {
-  const [mode, setMode] = useState<EngineMode>("senzee");
-  const [numWorkers, setNumWorkers] = useState(4);
+  const [implementation, setImplementation] = useState<ImplementationType>("cpp");
+  const [algorithm, setAlgorithm] = useState<AlgorithmType>("cactus_kev");
+  const [optimizations, setOptimizations] = useState<OptimizationType[]>([]);
+  const [numWorkers, setNumWorkers] = useState(navigator.hardwareConcurrency || 4);
   const [numSimulations, setNumSimulations] = useState(100000);
   const [card1, setCard1] = useState<CardType | null>(null);
   const [card2, setCard2] = useState<CardType | null>(null);
+
+  // Update algorithm when implementation changes
+  useEffect(() => {
+    if (implementation === "python") {
+      // Python only supports naive and cactus_kev
+      if (!["naive", "cactus_kev"].includes(algorithm)) {
+        setAlgorithm("cactus_kev");
+      }
+    }
+  }, [implementation, algorithm]);
   const {
     jobId,
     submitJob,
@@ -88,11 +102,12 @@ function App() {
       range_spec: rangeSpec,
       num_opponents: 1,
       num_simulations: numSimulations,
-      mode,
-      num_workers:
-        mode === "multiprocessing" || mode === "cpp_threaded"
-          ? numWorkers
-          : undefined,
+      implementation,
+      algorithm,
+      optimizations,
+      num_workers: optimizations.includes("multithreading")
+        ? numWorkers
+        : undefined,
     });
   };
 
@@ -179,9 +194,41 @@ function App() {
               </div>
             </div>
 
-            <ModeSelector
-              mode={mode}
-              onChange={setMode}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Implementation</label>
+              <ToggleGroup
+                type="single"
+                value={implementation}
+                onValueChange={(value) => {
+                  if (value) setImplementation(value as ImplementationType);
+                }}
+                className="justify-start"
+              >
+                <ToggleGroupItem value="python" aria-label="Python Implementation">
+                  Python
+                </ToggleGroupItem>
+                <ToggleGroupItem value="cpp" aria-label="C++ Implementation">
+                  C++
+                </ToggleGroupItem>
+              </ToggleGroup>
+              <p className="text-xs text-muted-foreground">
+                {implementation === "python"
+                  ? "Python implementation supports Naive and Cactus Kev algorithms"
+                  : "C++ implementation supports all algorithms with advanced optimizations"}
+              </p>
+            </div>
+
+            <AlgorithmSelector
+              algorithm={algorithm}
+              onChange={setAlgorithm}
+              implementation={implementation}
+              disabled={loading || !!jobId}
+            />
+
+            <OptimizationSelector
+              algorithm={algorithm}
+              optimizations={optimizations}
+              onChange={setOptimizations}
               numWorkers={numWorkers}
               onWorkersChange={setNumWorkers}
               disabled={loading || !!jobId}

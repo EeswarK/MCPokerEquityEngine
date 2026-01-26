@@ -1,3 +1,22 @@
+// Core algorithm types (matches backend AlgorithmType enum - lowercase)
+export type AlgorithmType =
+  | "naive"
+  | "cactus_kev"
+  | "ph_evaluator"
+  | "two_plus_two"
+  | "omp_eval";
+
+// Optimization flags (matches backend OptimizationType enum - lowercase)
+export type OptimizationType =
+  | "multithreading"
+  | "simd"
+  | "perfect_hash"
+  | "prefetching";
+
+// Implementation type for routing requests
+export type ImplementationType = "python" | "cpp";
+
+// Legacy engine mode for backwards compatibility
 export type EngineMode =
   | "base_python"
   | "senzee"

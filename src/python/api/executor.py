@@ -19,7 +19,14 @@ def execute_job_sync(
 
         from ..engine import create_engine
 
-        engine = create_engine(request.mode, request.num_workers, job_id=job_id)
+        # Use new algorithm/optimizations if provided, otherwise fall back to legacy mode
+        engine = create_engine(
+            mode=request.mode,
+            algorithm=request.algorithm,
+            optimizations=request.optimizations,
+            num_workers=request.num_workers,
+            job_id=job_id
+        )
 
         current_pid = os.getpid()
         telemetry_port = int(os.getenv("TELEMETRY_PORT", "8001"))

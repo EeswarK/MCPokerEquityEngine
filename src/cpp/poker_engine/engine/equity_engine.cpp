@@ -101,7 +101,16 @@ EquityResult EquityEngine::calculate_hand_equity(
     int simulations_per_hand,
     std::unordered_map<std::string, EquityResult>& results) {
 
-  int num_workers = request.num_workers <= 0 ? 1 : request.num_workers;
+  // Check if MULTITHREADING optimization is enabled
+  auto has_multithreading = std::any_of(request.optimizations.begin(), request.optimizations.end(),
+                                         [](const std::string& opt) {
+                                           std::string opt_lower = opt;
+                                           std::transform(opt_lower.begin(), opt_lower.end(), opt_lower.begin(), ::tolower);
+                                           return opt_lower == "multithreading";
+                                         });
+
+  // Only use multiple workers if MULTITHREADING optimization is enabled
+  int num_workers = (has_multithreading && request.num_workers > 0) ? request.num_workers : 1;
   std::mutex results_mutex;
   const int update_interval = 1000;
 
@@ -111,10 +120,18 @@ EquityResult EquityEngine::calculate_hand_equity(
     std::unordered_map<std::string, EquityResult> local_opponent_stats;
     Deck deck;
 
-    bool use_simd =
-        (request.algorithm == "omp" &&
-         std::find(request.optimizations.begin(), request.optimizations.end(),
-                   "simd") != request.optimizations.end());
+    // Check if SIMD optimization is enabled (case-insensitive)
+    std::string algo_lower = request.algorithm;
+    std::transform(algo_lower.begin(), algo_lower.end(), algo_lower.begin(), ::tolower);
+
+    auto has_simd = std::any_of(request.optimizations.begin(), request.optimizations.end(),
+                                 [](const std::string& opt) {
+                                   std::string opt_lower = opt;
+                                   std::transform(opt_lower.begin(), opt_lower.end(), opt_lower.begin(), ::tolower);
+                                   return opt_lower == "simd";
+                                 });
+
+    bool use_simd = ((algo_lower == "omp" || algo_lower == "omp_eval") && has_simd);
 
     int sim_num = 0;
     while (sim_num < worker_sims) {
@@ -347,10 +364,17 @@ EquityResult EquityEngine::calculate_hand_equity(
 int32_t EquityEngine::evaluate_with_algorithm(const std::string& algorithm,
                                                const std::vector<Card>& hole,
                                                const std::vector<Card>& board) const {
-    if (algorithm == "cactus_kev") return cactus_kev_evaluator_.evaluate_hand(hole, board);
-    if (algorithm == "perfect_hash") return ph_evaluator_.evaluate_hand(hole, board);
-    if (algorithm == "two_plus_two") return tpt_evaluator_.evaluate_hand(hole, board);
-    if (algorithm == "omp") return omp_evaluator_.evaluate_hand(hole, board);
+    // Support both lowercase and uppercase enum values from frontend
+    std::string algo_lower = algorithm;
+    std::transform(algo_lower.begin(), algo_lower.end(), algo_lower.begin(), ::tolower);
+
+    if (algo_lower == "cactus_kev") return cactus_kev_evaluator_.evaluate_hand(hole, board);
+    if (algo_lower == "ph_evaluator" || algo_lower == "perfect_hash") return ph_evaluator_.evaluate_hand(hole, board);
+    if (algo_lower == "two_plus_two") return tpt_evaluator_.evaluate_hand(hole, board);
+    if (algo_lower == "omp_eval" || algo_lower == "omp") return omp_evaluator_.evaluate_hand(hole, board);
+    if (algo_lower == "naive") return naive_evaluator_.evaluate_hand(hole, board);
+
+    // Default to naive if unknown algorithm
     return naive_evaluator_.evaluate_hand(hole, board);
 }
 

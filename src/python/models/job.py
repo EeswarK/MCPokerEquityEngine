@@ -28,19 +28,26 @@ class JobRequest:
 
 @dataclass
 class PerformanceMetrics:
-    mode: str
     duration_seconds: float
     simulations_per_second: float
+    mode: Optional[str] = None  # Legacy field (deprecated)
+    algorithm: Optional[str] = None
+    optimizations: Optional[List[str]] = None
     cpu_percent: Optional[float] = None
     memory_mb: Optional[float] = None
     num_workers: Optional[int] = None
 
     def to_dict(self) -> Dict:
         result = {
-            "mode": self.mode,
             "duration_seconds": self.duration_seconds,
             "simulations_per_second": self.simulations_per_second,
         }
+        if self.mode is not None:
+            result["mode"] = self.mode
+        if self.algorithm is not None:
+            result["algorithm"] = self.algorithm
+        if self.optimizations is not None:
+            result["optimizations"] = self.optimizations
         if self.cpu_percent is not None:
             result["cpu_percent"] = self.cpu_percent
         if self.memory_mb is not None:

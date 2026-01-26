@@ -1,12 +1,21 @@
-import { EngineMode, HandRange, JobStatus, Card } from "../types";
+import { EngineMode, HandRange, JobStatus, Card, AlgorithmType, OptimizationType } from "../types";
 
 export interface CreateJobRequest {
   range_spec: HandRange;
   board?: Card[];
   num_opponents: number; // 1-9
   num_simulations: number; // 1000-10000000
-  mode: EngineMode;
-  num_workers?: number; // Optional, for multiprocessing/threaded modes
+
+  // Implementation selector (for routing)
+  implementation?: string; // "python" or "cpp"
+
+  // New algorithm selection (preferred approach)
+  algorithm?: AlgorithmType; // Core algorithm to use
+  optimizations?: OptimizationType[]; // Optional optimizations to apply
+  num_workers?: number; // Optional, for multithreading optimization
+
+  // Legacy mode field (deprecated, but kept for backwards compatibility)
+  mode?: EngineMode;
 }
 
 export interface CreateJobResponse {
@@ -35,7 +44,13 @@ export interface EquityResult {
 }
 
 export interface PerformanceMetrics {
-  mode: EngineMode;
+  // Legacy mode field (deprecated)
+  mode?: EngineMode;
+
+  // New algorithm fields
+  algorithm?: AlgorithmType;
+  optimizations?: OptimizationType[];
+
   duration_seconds: number;
   simulations_per_second: number;
   cpu_percent?: number;

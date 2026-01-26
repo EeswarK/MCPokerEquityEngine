@@ -202,7 +202,8 @@ void APIServer::execute_job(const std::string& job_id, const poker_engine::JobRe
         }
 
         // Create engine with job_id for shared memory
-        poker_engine::EquityEngine engine(request.mode, job_id);
+        // Note: algorithm and optimizations are passed through request and used in calculate_range_equity
+        poker_engine::EquityEngine engine(request.algorithm.empty() ? request.mode : request.algorithm, job_id);
 
         // Set progress callback
         engine.set_progress_callback(

@@ -13,15 +13,16 @@ export class APIClient {
   // Track which backend was used for each job to route status requests correctly
   private jobBackends: Map<string, string> = new Map();
 
-  private getBaseUrl(mode?: string): string {
-    if (mode?.startsWith("cpp_")) {
-      // For C++ modes, we use the /cpp/ prefix which Nginx routes to port 8002
-      // If API_BASE_URL is http://localhost:8000, we might need to handle local dev too
+  private getBaseUrl(implementation?: string): string {
+    // Route to C++ backend for cpp implementation
+    if (implementation === "cpp") {
+      // For C++ implementation, use the /cpp/ prefix which Nginx routes to port 8080
       if (API_BASE_URL.includes("localhost") || API_BASE_URL.includes("127.0.0.1")) {
-        return API_BASE_URL.replace(":8000", ":8002");
+        return API_BASE_URL.replace(":8000", ":8080");
       }
       return `${API_BASE_URL}/cpp`;
     }
+    // Python implementation uses default endpoint
     return API_BASE_URL;
   }
 
@@ -30,12 +31,12 @@ export class APIClient {
       return mockClient.createJob(request);
     }
 
-    const baseUrl = this.getBaseUrl(request.mode);
+    const baseUrl = this.getBaseUrl(request.implementation);
     const response = await axios.post(`${baseUrl}/api/jobs`, request);
-    
+
     const jobResponse = response.data as CreateJobResponse;
     this.jobBackends.set(jobResponse.job_id, baseUrl);
-    
+
     return jobResponse;
   }
 
