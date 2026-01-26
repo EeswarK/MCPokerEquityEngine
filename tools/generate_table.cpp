@@ -116,36 +116,84 @@ int DoEval(int64 IDin) {
             wk[cardnum] = primes[rank] | (rank << 8) | (1 << (suit + 11)) | (1 << (16 + rank));
         }
 
-        switch (numevalcards) {
-            case 5: 
-                holdrank = eval_5hand_fast(wk[0], wk[1], wk[2], wk[3], wk[4]);
-                break;
-            case 6:
-                holdrank = eval_5hand_fast(wk[0], wk[1], wk[2], wk[3], wk[4]);
-                holdrank = std::min(holdrank, eval_5hand_fast(wk[0], wk[1], wk[2], wk[3], wk[5]));
-                holdrank = std::min(holdrank, eval_5hand_fast(wk[0], wk[1], wk[2], wk[4], wk[5]));
-                holdrank = std::min(holdrank, eval_5hand_fast(wk[0], wk[1], wk[3], wk[4], wk[5]));
-                holdrank = std::min(holdrank, eval_5hand_fast(wk[0], wk[2], wk[3], wk[4], wk[5]));
-                holdrank = std::min(holdrank, eval_5hand_fast(wk[1], wk[2], wk[3], wk[4], wk[5]));
-                break;
-            case 7: 
-                holdrank = eval_7hand(wk);
-                break;
-            default:
-                break;
+        // To harmonize with NaiveEvaluator, we extract the best 5-card hand features
+        // and use the unified encode_score logic.
+        // Simplified mapping for the generator to match NaiveEvaluator's new logic:
+        
+        auto get_score = [&](int c1, int c2, int c3, int c4, int c5) -> int32_t {
+            int r[5] = { (c1>>8)&0xF, (c2>>8)&0xF, (c3>>8)&0xF, (c4>>8)&0xF, (c5>>8)&0xF };
+            std::sort(r, r+5);
+            bool flush = (c1 & c2 & c3 & c4 & c5 & 0xF000);
+            bool straight = true;
+            for(int i=0; i<4; i++) if(r[i+1] != r[i]+1) straight = false;
+            if(!straight && r[0]==0 && r[1]==1 && r[2]==2 && r[3]==3 && r[4]==12) {
+                straight = true; // Wheel
+                // For scoring, wheel is 5-high
+                r[0]=3; r[1]=2; r[2]=1; r[3]=0; r[4]=-1; // 5, 4, 3, 2, A(1)
+                std::sort(r, r+5, std::greater<int>());
+            } else {
+                std::sort(r, r+5, std::greater<int>());
+            }
+
+            int counts[13] = {0};
+            for(int i=0; i<5; i++) counts[r[i]]++;
+
+            // Scoring logic matching NaiveEvaluator::encode_score
+            // Builds ranks as base-15 number iteratively (matching hand_types.h)
+            auto encode = [](int type, const std::vector<int>& ranks) {
+                int32_t relative = 0;
+                for (size_t i = 0; i < ranks.size() && i < 5; ++i) {
+                    relative = relative * 15 + ranks[i];
+                }
+                return type * 1000000 + relative;
+            };
+
+            if (flush && straight) {
+                if (r[0] == 12 && r[4] == 8) return encode(9, {14, 13, 12, 11, 10}); // Royal
+                return encode(8, {r[0]+2}); // SF
+            }
+
+            int four= -1, three= -1, pair1= -1, pair2= -1;
+            std::vector<int> kickers;
+            for(int i=12; i>=0; i--) {
+                if(counts[i]==4) four = i;
+                else if(counts[i]==3) three = i;
+                else if(counts[i]==2) { if(pair1 == -1) pair1 = i; else pair2 = i; }
+                else if(counts[i]==1) kickers.push_back(i);
+            }
+
+            if(four != -1) return encode(7, {four+2, kickers[0]+2});
+            if(three != -1 && pair1 != -1) return encode(6, {three+2, pair1+2});
+            if(flush) return encode(5, {r[0]+2, r[1]+2, r[2]+2, r[3]+2, r[4]+2});
+            if(straight) return encode(4, {r[0]+2});
+            if(three != -1) return encode(3, {three+2, kickers[0]+2, kickers[1]+2});
+            if(pair1 != -1 && pair2 != -1) return encode(2, {pair1+2, pair2+2, kickers[0]+2});
+            if(pair1 != -1) return encode(1, {pair1+2, kickers[0]+2, kickers[1]+2, kickers[2]+2});
+            return encode(0, {r[0]+2, r[1]+2, r[2]+2, r[3]+2, r[4]+2});
+        };
+
+        int32_t best = 0;
+        int sub[5];
+        if (numevalcards == 5) {
+            best = get_score(wk[0], wk[1], wk[2], wk[3], wk[4]);
+        } else if (numevalcards == 6) {
+            for(int i=0; i<6; i++) {
+                int idx=0;
+                for(int k=0; k<6; k++) if(k!=i) sub[idx++] = wk[k];
+                int32_t s = get_score(sub[0], sub[1], sub[2], sub[3], sub[4]);
+                if(s > best) best = s;
+            }
+        } else if (numevalcards == 7) {
+            for(int i=0; i<7; i++) {
+                for(int j=i+1; j<7; j++) {
+                    int idx=0;
+                    for(int k=0; k<7; k++) if(k!=i && k!=j) sub[idx++] = wk[k];
+                    int32_t s = get_score(sub[0], sub[1], sub[2], sub[3], sub[4]);
+                    if(s > best) best = s;
+                }
+            }
         }
-
-        result = 7463 - holdrank;
-
-        if      (result < 1278) result = result -    0 + 4096 * 1;  
-        else if (result < 4138) result = result - 1277 + 4096 * 2;  
-        else if (result < 4996) result = result - 4137 + 4096 * 3;  
-        else if (result < 5854) result = result - 4995 + 4096 * 4;  
-        else if (result < 5864) result = result - 5853 + 4096 * 5;  
-        else if (result < 7141) result = result - 5863 + 4096 * 6;  
-        else if (result < 7297) result = result - 7140 + 4096 * 7;  
-        else if (result < 7453) result = result - 7296 + 4096 * 8;  
-        else                    result = result - 7452 + 4096 * 9;  
+        result = best;
     }
     return result;
 }

@@ -43,39 +43,21 @@ int32_t TwoPlusTwoEvaluator::evaluate_hand(const std::vector<Card>& hole_cards,
         p = lookup_table_[p + card_val];
     };
 
-    for (const auto& c : hole_cards) process_card(c);
-    for (const auto& c : board_cards) process_card(c);
+        for (const auto& c : hole_cards) process_card(c);
 
-    // The result is in p after 7 transitions
-    int res = p;
-
-    // Convert 2+2 internal HandRank to our engine score
+        for (const auto& c : board_cards) process_card(c);
 
     
-    // Convert 2+2 internal HandRank to our engine score
-    // hhhhrrrrrrrrrrrr format (from generate_table.cpp comment)
-    int hand_type = res >> 12;
-    int rank_within_type = res & 0x0FFF;
-    
-    // Map 2+2 types (1-9) to our thresholds
-    // 2+2: 1=HC, 2=Pair, 3=2Pair, 4=3Kind, 5=Straight, 6=Flush, 7=FH, 8=4Kind, 9=SF
-    // Ours: HC=0, Pair=1M, 2P=2M, 3K=3M, Str=4M, Fl=5M, FH=6M, 4K=7M, SF=8M, RF=9M
-    
-    switch (hand_type) {
-        case 9: // Straight Flush
-            if (rank_within_type == 10) return 9000000; // Royal Flush
-            return 8000000 + rank_within_type;
-        case 8: return 7000000 + rank_within_type; // Four of a Kind
-        case 7: return 6000000 + rank_within_type; // Full House
-        case 6: return 5000000 + rank_within_type; // Flush
-        case 5: return 4000000 + rank_within_type; // Straight
-        case 4: return 3000000 + rank_within_type; // Three of a Kind
-        case 3: return 2000000 + rank_within_type; // Two Pair
-        case 2: return 1000000 + rank_within_type; // One Pair
-        case 1: return rank_within_type;           // High Card
-        default: return 0;
+
+        // The result is in p after 7 transitions.
+
+        // In our new harmonized HandRanks.dat, p is the actual final score.
+
+        return p;
+
     }
-}
+
+    
 
 int32_t TwoPlusTwoEvaluator::evaluate_fallback(const std::vector<Card>& hole, const std::vector<Card>& board) const {
     // Correct fallback evaluation logic
