@@ -321,9 +321,11 @@ int main() {
         printf("Problem creating the Output File!\n");
         return 1;
     }
-    fwrite(HR, sizeof(HR), 1, fout);
+    // Only write the actually used portion of the table (up to maxHR + 1)
+    size_t bytes_to_write = (maxHR + 1) * sizeof(int);
+    fwrite(HR, bytes_to_write, 1, fout);
     fclose(fout);
-    
-    printf("HandRanks.dat generated.\n");
+
+    printf("HandRanks.dat generated (%zu MB).\n", bytes_to_write / (1024*1024));
     return 0;
 }
