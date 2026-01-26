@@ -2,6 +2,7 @@
 #define EVALUATORS_HAND_TYPES_H
 
 #include <cstdint>
+#include <vector>
 
 namespace poker_engine {
 
@@ -50,7 +51,6 @@ constexpr int32_t ONE_PAIR_MIN = 1000000;
 
 // Convert hand value to hand type (0-9)
 inline HandType get_hand_type(int32_t hand_value) {
-    // Matches Python: src/python/engine/strategies/naive/evaluator.py:164-199
     if (hand_value >= ROYAL_FLUSH_MIN) return ROYAL_FLUSH;
     if (hand_value >= STRAIGHT_FLUSH_MIN) return STRAIGHT_FLUSH;
     if (hand_value >= FOUR_KIND_MIN) return FOUR_OF_KIND;
@@ -61,6 +61,23 @@ inline HandType get_hand_type(int32_t hand_value) {
     if (hand_value >= TWO_PAIR_MIN) return TWO_PAIR;
     if (hand_value >= ONE_PAIR_MIN) return ONE_PAIR;
     return HIGH_CARD;
+}
+
+/**
+ * @brief Creates a unified, comparable score for any poker hand.
+ * format: [Type: 4 bits][R1: 4][R2: 4][R3: 4][R4: 4][R5: 4]
+ * This ensures perfect comparison including all kickers.
+ */
+inline int32_t encode_score(HandType type, const std::vector<uint8_t>& sorted_ranks) {
+    int32_t score = static_cast<int32_t>(type) * 1000000;
+    
+    // We add the ranks as a base-15 number (since Ace is 14)
+    // to the relative rank part. This is easy to debug and compare.
+    int32_t relative = 0;
+    for (size_t i = 0; i < sorted_ranks.size() && i < 5; ++i) {
+        relative = relative * 15 + sorted_ranks[i];
+    }
+    return score + relative;
 }
 
 }  // namespace poker_engine

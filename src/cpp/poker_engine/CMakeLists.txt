@@ -97,6 +97,7 @@ add_executable(unit_tests
     tests/test_simd_helper.cpp
     tests/test_multithreading.cpp
     tests/test_evaluator_conformance.cpp
+    tests/test_evaluator_consistency.cpp
     evaluators/cactus_kev_evaluator.cpp
     evaluators/ph_evaluator.cpp
     evaluators/two_plus_two_evaluator.cpp

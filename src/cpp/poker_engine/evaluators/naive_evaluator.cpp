@@ -74,88 +74,92 @@ int32_t NaiveEvaluator::evaluate_five_cards(const std::vector<Card>& cards) cons
     bool is_flush = (std::unordered_set<uint8_t>(suits.begin(), suits.end()).size() == 1);
     bool is_str = is_straight(ranks);
 
-    // Royal/Straight Flush (Python lines 106-109)
+    // Royal/Straight Flush
     if (is_str && is_flush) {
         uint8_t max_rank = *std::max_element(ranks.begin(), ranks.end());
-        uint8_t min_rank = *std::min_element(ranks.begin(), ranks.end());
-        if (max_rank == 14 && min_rank == 10) {
-            return 9000000;  // Royal flush
+        if (max_rank == 14 && *std::min_element(ranks.begin(), ranks.end()) == 10) {
+            return encode_score(HandType::ROYAL_FLUSH, {14, 13, 12, 11, 10});
         }
-        return 8000000 + max_rank;  // Straight flush
+        return encode_score(HandType::STRAIGHT_FLUSH, {max_rank});
     }
 
-    // Four of a Kind (Python lines 111-112)
-    if (counts == std::vector<int>{4, 1}) {
-        uint8_t quad_rank = 0;
+    // Four of a Kind
+    if (counts[0] == 4) {
+        uint8_t quad_rank = 0, kicker = 0;
         for (const auto& pair : rank_counts) {
             if (pair.second == 4) quad_rank = pair.first;
+            else kicker = pair.first;
         }
-        return 7000000 + quad_rank;
+        return encode_score(HandType::FOUR_OF_KIND, {quad_rank, kicker});
     }
 
-    // Full House (Python lines 114-115)
+    // Full House
     if (counts == std::vector<int>{3, 2}) {
-        uint8_t trips_rank = 0;
+        uint8_t trips_rank = 0, pair_rank = 0;
         for (const auto& pair : rank_counts) {
             if (pair.second == 3) trips_rank = pair.first;
+            else pair_rank = pair.first;
         }
-        return 6000000 + trips_rank;
+        return encode_score(HandType::FULL_HOUSE, {trips_rank, pair_rank});
     }
 
-    // Flush (Python lines 117-118)
+    // Flush
     if (is_flush) {
-        return 5000000 + *std::max_element(ranks.begin(), ranks.end());
+        std::vector<uint8_t> sorted = ranks;
+        std::sort(sorted.rbegin(), sorted.rend());
+        return encode_score(HandType::FLUSH, sorted);
     }
 
-    // Straight (Python lines 120-121)
+    // Straight
     if (is_str) {
-        return 4000000 + *std::max_element(ranks.begin(), ranks.end());
+        uint8_t max_rank = *std::max_element(ranks.begin(), ranks.end());
+        // Handle Ace-low straight
+        if (max_rank == 14 && std::find(ranks.begin(), ranks.end(), 2) != ranks.end()) {
+            max_rank = 5;
+        }
+        return encode_score(HandType::STRAIGHT, {max_rank});
     }
 
-    // Three of a Kind (Python lines 123-124)
-    if (counts == std::vector<int>{3, 1, 1}) {
+    // Three of a Kind
+    if (counts[0] == 3) {
         uint8_t trips_rank = 0;
+        std::vector<uint8_t> kickers;
         for (const auto& pair : rank_counts) {
             if (pair.second == 3) trips_rank = pair.first;
-        }
-        return 3000000 + trips_rank;
-    }
-
-    // Two Pair (Python lines 126-128)
-    if (counts == std::vector<int>{2, 2, 1}) {
-        std::vector<uint8_t> pairs;
-        for (const auto& pair : rank_counts) {
-            if (pair.second == 2) pairs.push_back(pair.first);
-        }
-        uint8_t max_pair = *std::max_element(pairs.begin(), pairs.end());
-        uint8_t min_pair = *std::min_element(pairs.begin(), pairs.end());
-        return 2000000 + max_pair * 100 + min_pair;
-    }
-
-    // One Pair (Python lines 130-133)
-    if (counts == std::vector<int>{2, 1, 1, 1}) {
-        uint8_t pair_rank = 0;
-        for (const auto& pair : rank_counts) {
-            if (pair.second == 2) pair_rank = pair.first;
-        }
-
-        std::vector<uint8_t> kickers;
-        for (uint8_t rank : ranks) {
-            if (rank != pair_rank) kickers.push_back(rank);
+            else kickers.push_back(pair.first);
         }
         std::sort(kickers.rbegin(), kickers.rend());
-
-        return 1000000 + pair_rank * 10000 + kickers[0] * 100 + kickers[1];
+        return encode_score(HandType::THREE_OF_KIND, {trips_rank, kickers[0], kickers[1]});
     }
 
-    // High Card (Python lines 135-142)
+    // Two Pair
+    if (counts == std::vector<int>{2, 2, 1}) {
+        std::vector<uint8_t> pairs;
+        uint8_t kicker = 0;
+        for (const auto& pair : rank_counts) {
+            if (pair.second == 2) pairs.push_back(pair.first);
+            else kicker = pair.first;
+        }
+        std::sort(pairs.rbegin(), pairs.rend());
+        return encode_score(HandType::TWO_PAIR, {pairs[0], pairs[1], kicker});
+    }
+
+    // One Pair
+    if (counts[0] == 2) {
+        uint8_t pair_rank = 0;
+        std::vector<uint8_t> kickers;
+        for (const auto& pair : rank_counts) {
+            if (pair.second == 2) pair_rank = pair.first;
+            else kickers.push_back(pair.first);
+        }
+        std::sort(kickers.rbegin(), kickers.rend());
+        return encode_score(HandType::ONE_PAIR, {pair_rank, kickers[0], kickers[1], kickers[2]});
+    }
+
+    // High Card
     std::vector<uint8_t> sorted_ranks = ranks;
     std::sort(sorted_ranks.rbegin(), sorted_ranks.rend());
-    return sorted_ranks[0] * 10000
-         + sorted_ranks[1] * 1000
-         + sorted_ranks[2] * 100
-         + sorted_ranks[3] * 10
-         + sorted_ranks[4];
+    return encode_score(HandType::HIGH_CARD, sorted_ranks);
 }
 
 // Matches: src/python/engine/strategies/naive/evaluator.py:145-161
