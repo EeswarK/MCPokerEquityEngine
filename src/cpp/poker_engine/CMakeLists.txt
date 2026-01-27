@@ -45,6 +45,7 @@ set(SOURCES
     evaluators/naive_evaluator.cpp
     evaluators/cactus_kev_evaluator.cpp
     evaluators/ph_evaluator.cpp
+    evaluators/ph_evaluator_tables.cpp
     evaluators/two_plus_two_evaluator.cpp
     evaluators/omp_eval.cpp
     engine/equity_engine.cpp
@@ -100,6 +101,7 @@ add_executable(unit_tests
     tests/test_evaluator_consistency.cpp
     evaluators/cactus_kev_evaluator.cpp
     evaluators/ph_evaluator.cpp
+    evaluators/ph_evaluator_tables.cpp
     evaluators/two_plus_two_evaluator.cpp
     evaluators/omp_eval.cpp
     evaluators/naive_evaluator.cpp
@@ -123,3 +125,23 @@ target_link_libraries(unit_tests PRIVATE
 
 include(GoogleTest)
 gtest_discover_tests(unit_tests)
+
+# --- Tools (optional) ---
+
+# PHEvaluator offline table generator
+# Build with: cmake -DBUILD_TOOLS=ON ..
+option(BUILD_TOOLS "Build offline table generation tools" OFF)
+
+if(BUILD_TOOLS)
+    add_executable(generate_ph_tables
+        ../../../tools/generate_ph_tables.cpp
+        evaluators/ph_evaluator_tables.cpp
+        core/card.cpp
+    )
+
+    target_include_directories(generate_ph_tables PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+    )
+
+    install(TARGETS generate_ph_tables DESTINATION bin)
+endif()
