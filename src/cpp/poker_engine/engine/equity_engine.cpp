@@ -364,18 +364,26 @@ EquityResult EquityEngine::calculate_hand_equity(
 int32_t EquityEngine::evaluate_with_algorithm(const std::string& algorithm,
                                                const std::vector<Card>& hole,
                                                const std::vector<Card>& board) const {
+    // OPTIMIZATION: Build fixed-size array once for zero-copy evaluation
+    // This eliminates vector overhead in hot path for ALL evaluators
+    Card cards[7];
+    int idx = 0;
+    for (const auto& c : hole) cards[idx++] = c;
+    for (const auto& c : board) cards[idx++] = c;
+
     // Support both lowercase and uppercase enum values from frontend
     std::string algo_lower = algorithm;
     std::transform(algo_lower.begin(), algo_lower.end(), algo_lower.begin(), ::tolower);
 
-    if (algo_lower == "cactus_kev") return cactus_kev_evaluator_.evaluate_hand(hole, board);
-    if (algo_lower == "ph_evaluator" || algo_lower == "perfect_hash") return ph_evaluator_.evaluate_hand(hole, board);
-    if (algo_lower == "two_plus_two") return tpt_evaluator_.evaluate_hand(hole, board);
-    if (algo_lower == "omp_eval" || algo_lower == "omp") return omp_evaluator_.evaluate_hand(hole, board);
-    if (algo_lower == "naive") return naive_evaluator_.evaluate_hand(hole, board);
+    // Call optimized evaluate_7() for all evaluators
+    if (algo_lower == "cactus_kev") return cactus_kev_evaluator_.evaluate_7(cards);
+    if (algo_lower == "ph_evaluator" || algo_lower == "perfect_hash") return ph_evaluator_.evaluate_7(cards);
+    if (algo_lower == "two_plus_two") return tpt_evaluator_.evaluate_7(cards);
+    if (algo_lower == "omp_eval" || algo_lower == "omp") return omp_evaluator_.evaluate_7(cards);
+    if (algo_lower == "naive") return naive_evaluator_.evaluate_7(cards);
 
     // Default to naive if unknown algorithm
-    return naive_evaluator_.evaluate_hand(hole, board);
+    return naive_evaluator_.evaluate_7(cards);
 }
 
 }  // namespace poker_engine

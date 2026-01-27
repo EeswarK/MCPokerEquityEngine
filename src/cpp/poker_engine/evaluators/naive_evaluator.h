@@ -22,6 +22,12 @@ class NaiveEvaluator {
  public:
   NaiveEvaluator() = default;
 
+  // NEW: Direct 7-card evaluation (zero-copy API)
+  inline int32_t evaluate_7(const Card cards[7]) const noexcept {
+    std::vector<Card> all_cards(cards, cards + 7);
+    return evaluate_hand(all_cards, {});
+  }
+
   // Evaluate best 5-card hand from hole cards + board
   // Matches: src/python/engine/strategies/naive/evaluator.py:6-27
   int32_t evaluate_hand(const std::vector<Card>& hole_cards,
