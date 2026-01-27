@@ -11,6 +11,12 @@ class OMPEval {
  public:
   OMPEval();
 
+  // NEW: Direct 7-card evaluation (zero-copy API)
+  inline int32_t evaluate_7(const Card cards[7]) const noexcept {
+    std::vector<Card> all_cards(cards, cards + 7);
+    return evaluate_hand(all_cards, {});
+  }
+
   // Evaluate best 5-card hand from 7 cards (pure bit math)
   int32_t evaluate_hand(const std::vector<Card>& hole_cards,
                         const std::vector<Card>& board_cards) const;
